@@ -1,0 +1,2186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stick it on a Shelf</title>
+<script>
+/* ==== INLINED clm-core.js (standalone build — do not edit) ==== */
+/* ============================================================
+   CLM/1 — Collection Logistics Suite · SHARED CORE
+   ------------------------------------------------------------------
+   The shared engine extracted in Phase 2, extended in Phase 3:
+     CLM       — the clm/1 manifest adapter (make/parse/download/handoff)
+     CLM_CORE  — the engines all tools build on:
+                   dims     — parsing, orientation enumeration, formatting
+                   fit      — car stowage + door passage checks
+                   pack2d   — free-rect 2D packer (trays / flat areas)
+                   cratepack— padding → grouping → trays → crates pipeline
+                              (incl. tray inventory limits)
+                   export   — CSV/TSV/JSON download helpers
+                   store    — safe localStorage JSON helpers
+
+   Loaded via <script src="clm-core.js"> before each app's own script.
+   The per-app wrappers in the tools are one-liners onto these functions —
+   edit behaviour here and every tool follows.
+
+   Extracted from the apps (identical logic):
+     orientations/checkItem/parse/dimStr       — otter-fit.html
+     numOrNull/parseDimsCell/shelf2D/
+     mergeFreeRects/trayUtil                   — capackybara.html
+     parseTrayInventory/applyPadding/snapDepth/
+     process/groupKey/groupItems/packTrays/
+     consolidate/crateHeight/buildCrates/
+     validatePlacements                        — capackybara.html (tray inventory edition)
+     num                                       — stick-it-on-a-shelf.html
+   ============================================================ */
+
+const CLM = {
+    FORMAT: 'clm/1',
+    esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g,
+            c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    },
+    make(project, sourceApp, items, containers, checks) {
+        return {
+            format: CLM.FORMAT,
+            project: project || 'Untitled project',
+            units: 'mm',
+            exported: new Date().toISOString(),
+            source: { app: sourceApp || 'unknown', version: '1' },
+            items: items || [],
+            containers: containers || [],
+            checks: checks || []
+        };
+    },
+    parse(text) {
+        const d = JSON.parse(text);
+        if (!d || d.format !== CLM.FORMAT || !Array.isArray(d.items)) {
+            throw new Error('not a clm/1 manifest');
+        }
+        d.containers = Array.isArray(d.containers) ? d.containers : [];
+        d.checks = Array.isArray(d.checks) ? d.checks : [];
+        return d;
+    },
+    download(m, filename) {
+        const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || 'collection-manifest.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    },
+    handoff(m) {
+        try { localStorage.setItem('clm-handoff', JSON.stringify({ t: Date.now(), m })); } catch (e) {}
+    },
+    readHandoff() {
+        try {
+            const h = JSON.parse(localStorage.getItem('clm-handoff') || 'null');
+            return h && h.m && h.m.format === CLM.FORMAT ? h.m : null;
+        } catch (e) { return null; }
+    },
+    clearHandoff() {
+        try { localStorage.removeItem('clm-handoff'); } catch (e) {}
+    },
+    offerBanner(myApp, onLoad) {
+        let m = null;
+        try { m = CLM.readHandoff(); } catch (e) {}
+        if (!m || (m.source && m.source.app === myApp)) return;
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:99999;background:#1f2937;' +
+            'color:#e5e7eb;border:1px solid #4b5563;border-radius:10px;padding:10px 14px;' +
+            'font:13px/1.45 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);' +
+            'display:flex;gap:10px;align-items:center;max-width:460px';
+        div.innerHTML = '<span>\uD83D\uDCE5 Manifest <b>\u201c' + CLM.esc(m.project) + '\u201d</b> from ' +
+            CLM.esc((m.source && m.source.app) || 'the suite') + ' \u2014 ' + m.items.length + ' item(s), ' +
+            m.containers.length + ' container(s)</span>';
+        const mk = (label, primary) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.style.cssText = 'cursor:pointer;border-radius:7px;padding:5px 11px;font:600 12px system-ui,sans-serif;' +
+                (primary ? 'background:#38bdf8;border:1px solid #38bdf8;color:#082f49'
+                         : 'background:transparent;border:1px solid #6b7280;color:#d1d5db');
+            return b;
+        };
+        const load = mk('Load', true), dismiss = mk('Dismiss', false);
+        load.onclick = () => { CLM.clearHandoff(); div.remove(); onLoad(m); };
+        dismiss.onclick = () => { CLM.clearHandoff(); div.remove(); };
+        div.appendChild(load);
+        div.appendChild(dismiss);
+        document.body.appendChild(div);
+    }
+};
+
+/* ================================================================
+   CLM_CORE — shared engines
+   ================================================================ */
+(function (root) {
+
+root.CLM = CLM;
+
+/* ---------- dims ---------- */
+function numOrNull(x) {
+        if (x === undefined || x === null) return null;
+        const n = parseFloat(String(x).trim());
+        return isFinite(n) && n > 0 ? n : null;
+    }
+
+function num(v, dflt) { const n = parseFloat(v); return isFinite(n) ? n : dflt; }
+
+function parseDimsCell(s) {
+        if (!s) return [null, null, null];
+
+        const parts = String(s)
+            .split(/[,;xX\u00d7]/)
+            .map(t => numOrNull(t));
+
+        return [parts[0] ?? null, parts[1] ?? null, parts[2] ?? null];
+    }
+
+function sortDesc(l, w, h) {
+    return [Number(l), Number(w), Number(h)].sort((a, b) => b - a);
+}
+
+function orientForPacking(item) {
+    return sortDesc(item.length_mm, item.width_mm, item.height_mm);
+}
+
+function orientations(l, w, h){
+  return [
+    { d:l, w:w, h:h, short:'none',
+      desc:'No rotation — load as entered.' },
+    { d:w, w:l, h:h, short:'turn 90° (upright)',
+      desc:'Keep upright and turn 90° clockwise (viewed from above).' },
+    { d:l, w:h, h:w, short:'roll onto side',
+      desc:'Roll 90° onto its right side; length still faces the door.' },
+    { d:h, w:l, h:w, short:'roll + turn 90°',
+      desc:'Roll 90° onto its right side, then turn 90° clockwise (viewed from above).' },
+    { d:w, w:h, h:l, short:'on end + turn 90°',
+      desc:'Stand it on its end (pitch 90° so length points up), then turn 90° clockwise (viewed from above).' },
+    { d:h, w:w, h:l, short:'stand on end',
+      desc:'Stand it on its end (pitch 90° about the width axis, length pointing up); original height faces the door.' },
+  ];
+}
+
+function parseItems(text){
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    line = line.trim(); if (!line) return;
+    if (/\t|;/.test(line)) line = line.replace(/(\d),(\d)/g, '$1$2');
+    let parts = line.split(/\t|,|;/).map(s => s.trim()).filter(s => s !== '');
+    if (parts.length < 1) parts = line.split(/\s+/);
+    const nums = []; let k = parts.length;
+    while (k > 0 && nums.length < 3){
+      const v = Number(parts[k-1]);
+      if (isFinite(v) && v > 0){ nums.unshift(v); k--; } else break;
+    }
+    const name = parts.slice(0, k).join(' ') || line.replace(/[,;\t]+$/,'');
+    if (nums.length === 0){ out.push({ name, error:true }); return; }
+    out.push({ name: name || 'Item ' + (out.length + 1),
+               l: nums[0] || 0, w: nums[1] || 0, h: nums[2] || 0 });
+  });
+  return out;
+}
+
+function dimStr(it) {
+    return [it.l, it.w, it.h].map(v => v > 0 ? v : '?').join(' x ');
+}
+
+/* ---------- fit (car stowage + door passage) ---------- */
+function checkItem(it, lift, door){
+  it.known = [it.l, it.w, it.h].filter(v => v > 0).length;
+  it.best = null; it.carBest = null; it.diagNote = ''; it.doorNote = '';
+  if (it.known === 3){
+    const effW = Math.min(door.w, lift.w), effH = Math.min(door.h, lift.h);
+    const opts = orientations(it.l, it.w, it.h).map(o => {
+      const carOK  = o.d <= lift.d && o.w <= lift.w && o.h <= lift.h;
+      const doorOK = o.w <= effW && o.h <= effH;
+      return { ...o, carOK, doorOK, ok: carOK && doorOK };
+    });
+    it.best   = opts.find(f => f.ok) || null;
+    it.carBest = opts.find(f => f.carOK) || null;
+    if (it.best){
+      it.status = it.best.short === 'none' ? 'fit' : 'rot';
+      it.margin = { d:lift.d - it.best.d, w:lift.w - it.best.w, h:lift.h - it.best.h };
+    } else if (it.carBest){
+      it.status = 'door';
+      const req = opts.filter(o => o.carOK).slice().sort((a,b) => a.w*a.h - b.w*b.h)[0];
+      it.doorNote = 'Fits inside the car (' + it.carBest.short + ') but its smallest presentable cross-section, ' +
+        req.w + ' × ' + req.h + ' mm, is larger than the ' + door.w + ' × ' + door.h + ' mm door.';
+    } else {
+      it.status = 'no';
+      const dims = [it.l, it.w, it.h].sort((a,b) => b - a);
+      const tiltLen = Math.sqrt(lift.d*lift.d + lift.h*lift.h);
+      const tiltX   = Math.hypot(lift.w, lift.h);
+      it.diagNote = (dims[0] <= tiltLen && dims[1] <= tiltX && dims[2] <= Math.min(lift.w, lift.h))
+        ? 'Longest side (' + dims[0] + ' mm) is shorter than the car\'s diagonal — an angled/tilted load might work, check manually.'
+        : '';
+    }
+  } else if (it.known === 1){
+    it.status = 'part';
+    const L = it.l;
+    const floorDiag = Math.hypot(lift.d, lift.w);
+    const bodyDiag  = Math.sqrt(lift.d**2 + lift.w**2 + lift.h**2);
+    if (L <= lift.d) it.lineFit = { type:'depth', short:'line along depth',
+      desc:'length fits lying along the depth', place:'line lies along the car depth, on the floor' };
+    else if (L <= floorDiag) it.lineFit = { type:'floorDiag', short:'line on floor diagonal',
+      desc:'length fits only lying diagonally on the floor', place:'line lies diagonally across the floor' };
+    else if (L <= bodyDiag) it.lineFit = { type:'bodyDiag', short:'line on body diagonal',
+      desc:'length fits only tilted corner-to-corner in 3D', place:'line tilted on the body diagonal' };
+    else it.lineFit = { type:'none', short:'too long',
+      desc:'length too long for the car in any direction', place:'shown sticking out along the depth' };
+  } else if (it.known === 2){
+    it.status = 'part';
+    if (it.l <= lift.d && it.w <= lift.w)
+      it.rectFit = { fits:true, rot:false, short:'as entered', desc:'footprint fits as entered (height unknown)' };
+    else if (it.w <= lift.d && it.l <= lift.w)
+      it.rectFit = { fits:true, rot:true, short:'turn 90°', desc:'footprint fits turned 90° (height unknown)' };
+    else
+      it.rectFit = { fits:false, rot:false, short:'no flat fit', desc:'footprint does not fit flat — may fit diagonally, check manually' };
+  } else {
+    it.status = 'no';
+  }
+}
+
+/* ---------- pack2d (free-rect packer) ---------- */
+function shelf2D(items, cL, cW) {
+        if (!items.length || cL <= 0 || cW <= 0) {
+            return { placed: [], notPlaced: [...items] };
+        }
+
+        const sorted = [...items].sort((a, b) => {
+            const am = Math.max(a.pL, a.pW);
+            const bm = Math.max(b.pL, b.pW);
+            return bm - am || (b.pL * b.pW) - (a.pL * a.pW);
+        });
+
+        const placed = [];
+        const notPlaced = [];
+        let freeRects = [{ x: 0, z: 0, w: cL, d: cW }];
+
+        for (const item of sorted) {
+            let bestFit = null;
+            let bestFitIndex = -1;
+            let bestRotation = false;
+
+            for (const [tl, tw, rot] of [[item.pL, item.pW, false], [item.pW, item.pL, true]]) {
+                for (let fi = 0; fi < freeRects.length; fi++) {
+                    const fr = freeRects[fi];
+
+                    if (tl <= fr.w && tw <= fr.d) {
+                        const waste = (fr.w * fr.d) - (tl * tw);
+
+                        if (bestFit === null || waste < bestFit.waste) {
+                            bestFit = {
+                                x: fr.x,
+                                z: fr.z,
+                                l: tl,
+                                w: tw,
+                                waste,
+                                fi
+                            };
+                            bestFitIndex = fi;
+                            bestRotation = rot;
+                        }
+                    }
+                }
+            }
+
+            if (bestFit) {
+                placed.push({
+                    ...item,
+                    px: bestFit.x,
+                    pz: bestFit.z,
+                    pl: bestFit.l,
+                    pw: bestFit.w,
+                    rot: bestRotation
+                });
+
+                const used = freeRects.splice(bestFitIndex, 1)[0];
+                const newFree = [];
+
+                if (used.w - bestFit.l > 10) {
+                    newFree.push({
+                        x: used.x + bestFit.l,
+                        z: used.z,
+                        w: used.w - bestFit.l,
+                        d: used.d
+                    });
+                }
+
+                if (used.d - bestFit.w > 10) {
+                    newFree.push({
+                        x: used.x,
+                        z: used.z + bestFit.w,
+                        w: bestFit.l,
+                        d: used.d - bestFit.w
+                    });
+                }
+
+                freeRects = [...freeRects, ...newFree];
+                freeRects = mergeFreeRects(freeRects);
+            } else {
+                notPlaced.push(item);
+            }
+        }
+
+        return { placed, notPlaced };
+    }
+
+function mergeFreeRects(rects) {
+        const merged = [];
+
+        for (let i = 0; i < rects.length; i++) {
+            let contained = false;
+
+            for (let j = 0; j < rects.length; j++) {
+                if (i === j) continue;
+
+                const a = rects[i];
+                const b = rects[j];
+
+                if (
+                    a.x >= b.x &&
+                    a.z >= b.z &&
+                    a.x + a.w <= b.x + b.w &&
+                    a.z + a.d <= b.z + b.d
+                ) {
+                    contained = true;
+                    break;
+                }
+            }
+
+            if (!contained) merged.push(rects[i]);
+        }
+
+        return merged;
+    }
+
+function trayUtil(items, tL, tW, tD) {
+        if (!items || !items.length || tL <= 0 || tW <= 0 || tD <= 0) return 0;
+
+        return items.reduce((s, i) => {
+            return s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0);
+        }, 0) / (tL * tW * tD);
+    }
+
+/* ---------- cratepack: padding → grouping → trays → crates ---------- */
+function parseTrayInventory(inputStr) {
+    const inventory = {};
+    const parts = inputStr.split(',').map(s => s.trim()).filter(s => s);
+    let hasLimits = false;
+
+    parts.forEach(part => {
+        if (part.includes(':')) {
+            const [d, c] = part.split(':').map(s => parseInt(s.trim()));
+            if (!isNaN(d) && !isNaN(c)) {
+                inventory[d] = c;
+                hasLimits = true;
+            }
+        } else {
+            const d = parseInt(part);
+            if (!isNaN(d)) {
+                inventory[d] = Infinity; // Infinite supply if no count is given
+            }
+        }
+    });
+
+    return { inventory, hasLimits };
+}
+
+function applyPadding(item, cfg) {
+        const [baseLength, baseWidth, uprightHeight] = orientForPacking(item);
+        let pl, pw, ph;
+
+        if (cfg.padStrategy === 'proportional') {
+            const pL = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseLength * cfg.padFactor / 100));
+            const pW = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseWidth * cfg.padFactor / 100));
+
+            pl = baseLength + 2 * pL;
+            pw = baseWidth + 2 * pW;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        } else {
+            pl = baseLength + 2 * cfg.flatPad;
+            pw = baseWidth + 2 * cfg.flatPad;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        }
+
+        return {
+            ...item,
+            pL: Math.ceil(pl),
+            pW: Math.ceil(pw),
+            pH: Math.ceil(ph),
+            bL: baseLength,
+            bW: baseWidth
+        };
+    }
+
+function snapDepth(h, depths) {
+        for (const d of depths) {
+            if (h <= d) return { depth: d, custom: false };
+        }
+        return { depth: Math.ceil(h / 50) * 50, custom: true };
+    }
+
+function process(raw, cfg) {
+        return raw.map(item => {
+            const it = { ...item };
+
+            if (!it.length_mm || it.length_mm <= 0) {
+                it.length_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.width_mm || it.width_mm <= 0) {
+                it.width_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.height_mm || it.height_mm <= 0) {
+                it.height_mm = cfg.heightDefaults[it.type] || cfg.fallbackHeight || 50;
+            }
+
+            const p = applyPadding(it, cfg);
+            const s = snapDepth(p.pH, cfg.trayDepths);
+
+            return {
+                ...p,
+                snapDepth: s.depth,
+                isCustom: s.custom
+            };
+        });
+    }
+
+function groupKey(item, strategy) {
+        return strategy === 'type-depth'
+            ? `${item.type}__${item.snapDepth}`
+            : `d__${item.snapDepth}`;
+    }
+
+function groupItems(items, strategy) {
+        const g = {};
+
+        for (const it of items) {
+            const k = groupKey(it, strategy);
+            if (!g[k]) {
+                g[k] = {
+                    key: k,
+                    type: it.type,
+                    depth: it.snapDepth,
+                    items: []
+                };
+            }
+            g[k].items.push(it);
+        }
+
+        return Object.values(g);
+    }
+
+function packTrays(groups, cfg, trayInventory) {
+    const trays = [];
+    const unpacked = [];
+    let tid = 0;
+
+    for (const grp of groups) {
+        grp.items.sort((a, b) => (b.pL * b.pW) - (a.pL * a.pW));
+        let rem = [...grp.items];
+
+        // Get all depths >= group's required depth, sorted ascending
+        const validDepths = cfg.trayDepths.filter(d => d >= grp.depth);
+
+        for (const fp of cfg.footprints) {
+            while (rem.length > 0) {
+                // 1. Try to pack into the current footprint
+                const res = shelf2D(rem, fp.l, fp.w);
+
+                if (res.placed.length === 0) {
+                    // Items are too large for this footprint entirely.
+                    break;
+                }
+
+                // 2. Find the smallest available depth that fits the group's requirement
+                let assignedDepth = null;
+                for (const d of validDepths) {
+                    if (trayInventory[d] > 0) {
+                        assignedDepth = d;
+                        break;
+                    }
+                }
+
+                if (!assignedDepth) {
+                    // We ran out of all valid trays. 
+                    rem.forEach(item => item.unpackedReason = 'no_trays');
+                    unpacked.push(...rem);
+                    rem = [];
+                    break;
+                }
+
+                // We have a tray! Consume it from the physical inventory.
+                trayInventory[assignedDepth]--;
+
+                tid++;
+                trays.push({
+                    id: tid,
+                    fp: { l: fp.l, w: fp.w },
+                    depth: assignedDepth, // Note: This might be larger than grp.depth if we spilled over
+                    type: grp.type,
+                    items: res.placed,
+                    util: trayUtil(res.placed, fp.l, fp.w, assignedDepth)
+                });
+
+                rem = res.notPlaced;
+            }
+
+            if (rem.length === 0) break;
+        }
+
+        // If there are still items left after checking all footprints, they are physically oversized
+        if (rem.length > 0) {
+            rem.forEach(item => item.unpackedReason = 'oversized');
+            unpacked.push(...rem);
+        }
+    }
+
+    return { trays, unpacked };
+}
+
+function consolidate(trays, cfg) {
+        if (trays.length <= 1) return trays;
+
+        const res = [...trays];
+        let changed = true;
+        let iter = 0;
+
+        while (changed && iter < 100) {
+            changed = false;
+            iter++;
+
+            for (let i = 0; i < res.length && !changed; i++) {
+                if (res[i].util * 100 >= cfg.minUtil) continue;
+
+                for (let j = i + 1; j < res.length && !changed; j++) {
+                    if (res[i].fp.l !== res[j].fp.l || res[i].fp.w !== res[j].fp.w) continue;
+                    if (Math.abs(res[i].depth - res[j].depth) > cfg.maxDepthVar) continue;
+                    if (!cfg.crossType && res[i].type !== res[j].type) continue;
+
+                    const all = [...res[i].items, ...res[j].items].map(it => ({
+                        ...it,
+                        px: undefined,
+                        pz: undefined,
+                        pl: undefined,
+                        pw: undefined,
+                        rot: undefined
+                    }));
+
+                    const r2 = shelf2D(all, res[i].fp.l, res[i].fp.w);
+
+                    if (!r2.notPlaced.length) {
+                        res[i].items = r2.placed;
+                        res[i].depth = Math.max(res[i].depth, res[j].depth);
+                        res[i].util = trayUtil(r2.placed, res[i].fp.l, res[i].fp.w, res[i].depth);
+
+                        if (cfg.crossType) {
+                            res[i].type = res[i].type + '/' + res[j].type;
+                        }
+
+                        res.splice(j, 1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        res.forEach((t, i) => t.id = i + 1);
+        return res;
+    }
+
+function crateHeight(trays, allow) {
+        let h = allow.base + allow.top;
+
+        trays.forEach((t, i) => {
+            if (i > 0) h += allow.interlayer;
+            h += t.extD; // Use external depth (internal + base + lid)
+        });
+
+        return h;
+    }
+
+function buildCrates(trays, allow, maxCrate, trayStruct) {
+        if (!trays.length) return [];
+
+        const groups = {};
+
+        for (const t of trays) {
+            // Calculate EXTERNAL tray dimensions
+            const extTrayL = t.fp.l + (2 * trayStruct.sideWall);
+            const extTrayW = t.fp.w + (2 * trayStruct.sideWall);
+            const extTrayD = t.depth + trayStruct.base + trayStruct.lid;
+
+            const k = extTrayL + 'x' + extTrayW;
+
+            if (!groups[k]) {
+                groups[k] = {
+                    extFp: { l: extTrayL, w: extTrayW },
+                    extDepth: extTrayD,
+                    trays: []
+                };
+            }
+
+            groups[k].trays.push({
+                ...t,
+                extL: extTrayL,
+                extW: extTrayW,
+                extD: extTrayD
+            });
+        }
+
+        // Heavier trays toward the bottom of each crate
+        for (const g of Object.values(groups)) {
+            g.trays.sort((a, b) => {
+                const massA = a.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+                const massB = b.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+
+                if (massB !== massA) return massB - massA;
+                return b.extD - a.extD;
+            });
+        }
+
+        const crates = [];
+        let cid = 0;
+
+        for (const g of Object.values(groups)) {
+            let chunk = [];
+
+            for (const tray of g.trays) {
+                const test = [...chunk, tray];
+                const testH = crateHeight(test, allow);
+
+                if (maxCrate.h > 0 && testH > maxCrate.h && chunk.length > 0) {
+                    cid++;
+                    const h = crateHeight(chunk, allow);
+                    const l = g.extFp.l + (2 * allow.sides);
+                    const w = g.extFp.w + (2 * allow.sides);
+
+                    crates.push({
+                        id: cid,
+                        ext: { l, w, h },
+                        trays: chunk,
+                        yBase: allow.base,
+                        overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                    });
+
+                    chunk = [tray];
+                } else {
+                    chunk.push(tray);
+                }
+            }
+
+            if (chunk.length > 0) {
+                cid++;
+                const h = crateHeight(chunk, allow);
+                const l = g.extFp.l + (2 * allow.sides);
+                const w = g.extFp.w + (2 * allow.sides);
+
+                crates.push({
+                    id: cid,
+                    ext: { l, w, h },
+                    trays: chunk,
+                    yBase: allow.base,
+                    overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                });
+            }
+        }
+
+        return crates;
+    }
+
+function validatePlacements(trays) {
+        let v = 0;
+
+        for (const tray of trays) {
+            for (const it of tray.items) {
+                if (it.px + it.pl > tray.fp.l + 0.01 || it.pz + it.pw > tray.fp.w + 0.01) {
+                    v++;
+                }
+            }
+        }
+
+        return v;
+    }
+
+function makeOversizedCrates(items, cfg) {
+    if (!cfg.createOvrCrates || !items.length) return { crates: [], unpacked: [...items] };
+
+    const crates = [];
+    let ovrIdx = 1;
+
+    for (const item of items) {
+        const extTrayL = item.pL + (2 * cfg.trayStruct.sideWall);
+        const extTrayW = item.pW + (2 * cfg.trayStruct.sideWall);
+        const extTrayD = item.pH + cfg.trayStruct.base + cfg.trayStruct.lid;
+
+        const l = extTrayL + (2 * cfg.allow.sides);
+        const w = extTrayW + (2 * cfg.allow.sides);
+        const h = extTrayD + cfg.allow.base + cfg.allow.top;
+
+        const synTray = {
+            id: 'OVR-T' + ovrIdx,
+            fp: { l: item.pL, w: item.pW },
+            depth: item.pH,
+            extL: extTrayL,
+            extW: extTrayW,
+            extD: extTrayD,
+            type: item.type,
+            items: [{
+                ...item,
+                px: 0,
+                pz: 0,
+                pl: item.pL,
+                pw: item.pW,
+                rot: false
+            }],
+            util: 1.0
+        };
+
+        crates.push({
+            id: 'OVR-' + ovrIdx,
+            ext: { l, w, h },
+            trays: [synTray],
+            yBase: cfg.allow.base,
+            overMax:
+                (cfg.maxCrate.h > 0 && h > cfg.maxCrate.h) ||
+                (cfg.maxCrate.l > 0 && l > cfg.maxCrate.l) ||
+                (cfg.maxCrate.w > 0 && w > cfg.maxCrate.w),
+            isOversized: true
+        });
+
+        ovrIdx++;
+    }
+
+    return { crates, unpacked: [] };
+}
+
+/* ---------- export ---------- */
+function csvEsc(v) {
+    v = String(v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+
+function toCSV(rows) {
+    return '\uFEFF' + rows.map(r => r.map(csvEsc).join(',')).join('\r\n');
+}
+
+function toTSV(rows) {
+    return rows.map(r => r.join('\t')).join('\r\n');
+}
+
+function downloadText(filename, text, mime) {
+    const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function downloadJSON(filename, obj) {
+    downloadText(filename, JSON.stringify(obj, null, 2), 'application/json');
+}
+
+/* ---------- store (safe localStorage JSON) ---------- */
+function getLS(key, dflt) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? dflt; } catch (e) { return dflt; }
+}
+
+function setLS(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+function removeLS(key) {
+    try { localStorage.removeItem(key); } catch (e) {}
+}
+
+root.CLM_CORE = {
+    dims: {
+        numOrNull, num, parseDimsCell, sortDesc,
+        orientations, parseItems, dimStr
+    },
+    fit: { checkItem },
+    pack2d: { shelf2D, mergeFreeRects, trayUtil },
+    cratepack: {
+        parseTrayInventory, applyPadding, snapDepth, process,
+        groupKey, groupItems, packTrays, consolidate,
+        crateHeight, buildCrates, validatePlacements, makeOversizedCrates
+    },
+    export: { csvEsc, toCSV, toTSV, downloadText, downloadJSON },
+    store: { getLS, setLS, removeLS }
+};
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --paper: #efe9dd; --surface: #f8f4ea; --ink: #33302a; --ink-soft: #7c7364;
+        --moss: #6e7a5e; --moss-deep: #545e44; --clay: #b25f43; --clay-deep: #8f4931;
+        --line: #ddd2bb; --line-soft: #e8dfcb;
+        --sky-tint: #e7ece4; --sky-text: #4c5842;
+        --font-display: "Zen Old Mincho", "Hiragino Mincho ProN", serif;
+        --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: var(--font-body); background: var(--paper); color: var(--ink);
+        margin: 0; padding: 32px 24px; line-height: 1.6;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(51,48,42,0.045) 1px, transparent 0);
+        background-size: 22px 22px;
+    }
+    .container { max-width: 1360px; margin: 0 auto; }
+
+    header { margin-bottom: 32px; padding-bottom: 18px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; }
+    h1 { margin: 0; color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 1.65rem; letter-spacing: 0.02em; }
+    header .kicker { color: var(--ink-soft); font-size: 0.8rem; letter-spacing: 0.06em; }
+    h2 {
+        color: var(--ink); font-family: var(--font-display); font-weight: 500; font-size: 1.05rem;
+        margin: 0 0 18px 0; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft);
+    }
+
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 22px 24px; margin-bottom: 20px; }
+    .grid { display: grid; gap: 20px; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .layout { display: grid; gap: 20px; grid-template-columns: 420px 1fr; align-items: start; }
+    @media (max-width: 1000px) { .grid-2, .grid-3, .layout { grid-template-columns: 1fr; } }
+
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 0.72rem; font-weight: 500; color: var(--ink-soft); margin-bottom: 6px; letter-spacing: 0.03em; }
+    input, select {
+        width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 2px;
+        font-family: var(--font-body); font-size: 0.95rem; color: var(--ink);
+        box-sizing: border-box; background: var(--paper); transition: border-color 0.15s, background 0.15s;
+    }
+    select {
+        appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='11' height='7'><path d='M0 0L5.5 7L11 0Z' fill='%237c7364'/></svg>");
+        background-repeat: no-repeat; background-position: right 12px center; padding-right: 30px;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--moss); background: var(--surface); }
+    input[type="checkbox"] { width: auto; accent-color: var(--moss); }
+
+    .btn {
+        padding: 9px 18px; border: 1px solid transparent; border-radius: 2px;
+        font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; letter-spacing: 0.01em;
+        cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+        text-decoration: none; display: inline-block;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--moss); color: var(--surface); }
+    .btn-primary:hover:not(:disabled) { background: var(--moss-deep); }
+    .btn-danger { background: transparent; border-color: var(--clay); color: var(--clay-deep); padding: 5px 10px; font-size: 0.8rem; }
+    .btn-danger:hover:not(:disabled) { background: var(--clay); color: var(--surface); }
+    .btn-secondary { background: transparent; border-color: var(--line); color: var(--ink); }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--ink-soft); background: var(--paper); }
+    .btn-nav { background: var(--ink); color: var(--surface); padding: 6px 14px; }
+    .btn-nav:hover:not(:disabled) { background: var(--moss-deep); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line-soft); font-size: 0.92rem; vertical-align: middle; }
+    th { font-size: 0.72rem; letter-spacing: 0.04em; color: var(--ink-soft); font-weight: 500; }
+    .chip { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+
+    #overview-table tbody tr { cursor: pointer; }
+    #overview-table tbody tr:hover { background: var(--sky-tint); }
+    #overview-table tbody tr.active-row { background: var(--sky-tint); box-shadow: inset 3px 0 0 var(--moss); }
+    .thumb-svg { background: var(--paper); border: 1px solid var(--line-soft); border-radius: 2px; display: block; }
+
+    .summary-box { margin-top: 15px; padding: 16px; background: var(--sky-tint); border: 1px solid var(--line-soft); border-radius: 2px; display: flex; justify-content: space-around; text-align: center; }
+    .summary-val { font-family: var(--font-display); font-size: 1.9rem; font-weight: 600; color: var(--sky-text); display: block; }
+    .summary-label { font-size: 0.72rem; color: var(--ink-soft); letter-spacing: 0.04em; font-weight: 500; }
+
+    .viewer-wrap { position: relative; border: 1px solid var(--line-soft); border-radius: 2px; overflow: hidden; }
+    #viewer { display: block; width: 100%; cursor: grab; }
+    #viewer:active { cursor: grabbing; }
+    #tooltip { position: absolute; background: rgba(51,48,42,0.92); color: var(--surface); padding: 6px 10px; border-radius: 2px; font-size: 0.8rem; pointer-events: none; display: none; white-space: nowrap; z-index: 10; }
+    .viewer-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+    .viewer-stats { display: flex; gap: 25px; margin-top: 12px; font-size: 0.88rem; color: var(--ink-soft); flex-wrap: wrap; }
+    .viewer-stats strong { color: var(--ink); font-weight: 600; }
+    .hint { font-size: 0.8rem; color: var(--ink-soft); margin: 10px 0 0 0; }
+    .warning-box { margin-top: 12px; padding: 12px 14px; background: #f3e6df; border: 1px solid #e2c3b3; border-radius: 2px; color: var(--clay-deep); font-size: 0.88rem; display: none; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .mode-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+    .mode-btn {
+        padding: 8px 16px; border: none; background: var(--paper); color: var(--ink-soft);
+        font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .mode-btn + .mode-btn { border-left: 1px solid var(--line); }
+    .mode-btn.active { background: var(--moss); color: var(--surface); }
+    .mode-btn:hover:not(.active) { background: var(--surface); }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Stick it on a Shelf</h1>
+        <span class="kicker">Museum storage &amp; shelf-fit planner</span>
+        <p style="margin:5px 0 0 0; color:var(--text-muted);"></p>
+        <a class="btn btn-secondary" href="suite.html" style="margin-left:auto; align-self:center;">Back to Hub</a>
+    </header>
+
+    <div class="card" style="padding: 14px 24px;">
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+            <label style="margin:0; font-size:0.72rem; font-weight:500; color:var(--ink-soft); letter-spacing:0.03em;">What are you packing?</label>
+            <div class="mode-toggle" role="group" aria-label="Packing mode">
+                <button type="button" class="mode-btn active" id="mode-shelf" data-mode="shelf">Boxes onto a shelf</button>
+                <button type="button" class="mode-btn" id="mode-box" data-mode="box">Items into a box</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>1. Plans & Files</h2>
+        <div class="grid grid-2">
+            <div>
+                <div class="form-group">
+                    <label>Current plan name</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="plan-name" value="Untitled plan" style="flex:1;">
+                        <button class="btn btn-primary" id="plan-save">Save</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Open / delete saved plans</label>
+                    <div style="display:flex; gap:8px;">
+                        <select id="plan-open" style="flex:1;"></select>
+                        <button class="btn btn-nav" id="plan-open-btn">Open</button>
+                        <button class="btn btn-danger" id="plan-delete">Delete</button>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" id="plan-new">New</button>
+                    <button class="btn btn-secondary" id="file-export">Export file</button>
+                    <button class="btn btn-secondary" id="file-import-btn">Import file</button>
+                    <button class="btn btn-secondary" id="clm-out">Send to Suite</button>
+                    <button class="btn btn-secondary" id="clm-in">Load Manifest</button>
+                    <a class="btn btn-secondary" href="Put%20it%20on%20a%20Shelf.xlsm" download="Put it on a Shelf.xlsm">Download bulk import tool</a>
+                    <input type="file" id="file-import" accept=".json,application/json" style="display:none;">
+                    <input type="file" id="clm-file" accept=".json,application/json" style="display:none;">
+                </div>
+                <p class="hint">Your work autosaves in this browser after every change &mdash; including manual box moves.</p>
+            </div>
+            <div>
+                <div class="form-group">
+                    <label id="preset-label">Shelf presets</label>
+                    <select id="preset-select"></select>
+                </div>
+                <button class="btn btn-secondary" id="preset-save">Save current dims as preset</button>
+                <p class="hint">Picking a preset fills the location dimensions below (you can still edit them). Presets you save are stored in this browser.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 id="container-heading">2. Shelf Specifications</h2>
+        <div class="grid grid-3">
+            <div class="form-group"><label>Internal Width (mm)</label><input type="number" id="shelf-w" value="1200" min="0"></div>
+            <div class="form-group"><label>Internal Depth (mm)</label><input type="number" id="shelf-d" value="600" min="0"></div>
+            <div class="form-group"><label>Clear Height (mm)</label><input type="number" id="shelf-h" value="400" min="0"></div>
+        </div>
+        <label style="display:flex; align-items:center; gap:10px; font-size:0.9rem; font-weight:500; color:var(--ink); margin:0;">
+            <input type="checkbox" id="single-toggle" style="width:auto; margin:0;">
+            Single-depth rows only (never place boxes/items behind others)
+        </label>
+        <label style="display:flex; align-items:center; gap:10px; font-size:0.9rem; font-weight:500; color:var(--ink); margin:8px 0 0;">
+            <input type="checkbox" id="single-height-toggle" style="width:auto; margin:0;">
+            Single-height rows only (never place boxes/items on top of others)
+        </label>
+    </div>
+
+    <div class="card">
+        <h2>3. Add Items to Storage Plan</h2>
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label>Select Box Type</label>
+                <select id="box-select"></select>
+            </div>
+            <div class="form-group"><label>Quantity to Store</label><input type="number" id="item-qty" value="1" min="1"></div>
+        </div>
+
+        <div id="custom-inputs" class="grid grid-3" style="display:none; margin-top:10px; padding-top:15px; border-top:1px dashed var(--line);">
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Item Label (optional)</label>
+                <input type="text" id="custom-name" placeholder="e.g. Painting crate, Oak chest...">
+            </div>
+            <div class="form-group"><label>Length (mm)</label><input type="number" id="custom-l" value="100"></div>
+            <div class="form-group"><label>Width (mm)</label><input type="number" id="custom-w" value="100"></div>
+            <div class="form-group"><label>Height (mm)</label><input type="number" id="custom-h" value="100"></div>
+        </div>
+
+        <button class="btn btn-primary" id="add-btn" style="width:100%; margin-top:10px;">Add to Plan</button>
+    </div>
+
+    <div class="layout">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0;">4. Storage Plan</h2>
+                <button class="btn btn-secondary" id="clear-btn" style="padding:6px 14px; font-size:0.85rem;">Clear All</button>
+            </div>
+            <table id="plan-table">
+                <thead><tr><th>Item</th><th>Qty</th><th>Dimensions (mm)</th><th></th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div class="summary-box">
+                <div><span class="summary-val" id="total-items">0</span><span class="summary-label">Total Items</span></div>
+                <div><span class="summary-val" id="total-shelves">0</span><span class="summary-label" id="total-shelves-label">Shelves Required</span></div>
+            </div>
+            <div class="warning-box" id="toobig-box"></div>
+        </div>
+
+        <div class="card">
+            <div class="viewer-bar">
+                <h2 style="margin:0;">5. 3D Visualisation</h2>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" id="rotate-btn" style="padding:6px 14px; font-size:0.85rem;">Rotate (R)</button>
+                    <button class="btn btn-secondary" id="repack-btn" style="padding:6px 14px; font-size:0.85rem;">Re-pack</button>
+                </div>
+                <div>
+                    <button class="btn btn-nav" id="prev-shelf">&larr;</button>
+                    <span id="shelf-label" style="margin:0 10px; font-weight:600;">Shelf 1 of 1</span>
+                    <button class="btn btn-nav" id="next-shelf">&rarr;</button>
+                </div>
+            </div>
+            <div class="viewer-wrap">
+                <canvas id="viewer"></canvas>
+                <div id="tooltip"></div>
+            </div>
+            <div class="viewer-stats">
+                <span>Fill: <strong id="stat-util">0%</strong></span>
+                <span><span id="stat-items-label-text">Items on this shelf:</span> <strong id="stat-items">0</strong></span>
+                <span>Tiers used: <strong id="stat-levels">0</strong></span>
+            </div>
+            <p class="hint">Drag empty space to rotate view &bull; Scroll to zoom &bull; <strong>Drag a box to move it</strong> (green = valid, red = invalid) &bull; Click to select, R to rotate &bull; Re-pack restores the automatic layout. Manually moved boxes stay where you put them when the plan changes.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 id="overview-heading">6. Shelf Loading Overview</h2>
+        <table id="overview-table">
+            <thead><tr><th id="overview-col-header">Shelf</th><th>Side View</th><th>Top View</th><th>Contents</th><th>Items</th><th>Tiers</th><th>Fill</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <p class="hint" id="overview-hint">Click a row to view that shelf in 3D. Thumbnails show the shelf from the side (width &times; height) and top (width &times; depth).</p>
+    </div>
+</div>
+
+<script>
+/* ==== INLINED clm-library.js (standalone build — do not edit) ==== */
+/* ============================================================
+   CLM/1 — Collection Logistics Suite · SHARED LIBRARY
+   ------------------------------------------------------------------
+   Single source of truth for the standard data all three tools use:
+   standard boxes, store/bay presets, tray footprints, typical crate
+   sizes, object-type height defaults, vehicle presets.
+
+   Loaded via <script src="clm-library.js"> by every suite app.
+   If this file is missing, each app falls back to its built-in copy,
+   so the tools still work standalone — but edit THIS file to keep the
+   suite in sync.
+
+   Dimensions are millimetres. Preset shape convention:
+     shelf/box/crate preset: { name, l, d, h }   (l = width along the wall,
+                                                   d = depth front-to-back,
+                                                   h = clear/outer height)
+     tray footprint:         { label, l, w }     (internal footprint)
+     vehicle:                { name, d, w, h, doorW, doorH }
+   ============================================================ */
+
+window.CLM_LIBRARY = {
+
+  version: '1',
+
+  /* ---- standard collection boxes (height is external) ---- */
+  standardBoxes: [
+    { name: 'Box C',  l: 430, w: 280, h: 95  },
+    { name: 'Box D',  l: 435, w: 285, h: 190 },
+    { name: 'Box E',  l: 585, w: 435, h: 95  },
+    { name: 'Box F',  l: 585, w: 435, h: 190 },
+    { name: 'Box A1', l: 682, w: 427, h: 285 },
+    { name: 'Box A',  l: 685, w: 427, h: 145 },
+    { name: 'Box B',  l: 877, w: 432, h: 145 },
+    { name: 'Box B1', l: 877, w: 432, h: 285 },
+    { name: 'Box G',  l: 430, w: 280, h: 305 },
+    { name: 'Box H',  l: 215, w: 280, h: 305 }
+  ],
+
+  /* ---- store / bay presets (shelf clearances) ---- */
+  shelfPresets: [
+    { name: 'Hurunui (Panel)',        l: 900,  d: 450, h: 320  },
+    { name: 'Waimakariri (Longspan)', l: 1800, d: 500, h: 340  },
+    { name: 'Textiles 1 (Longspan)',  l: 1800, d: 900, h: 300  },
+    { name: 'Textiles 2 (Longspan)',  l: 1800, d: 700, h: 300  },
+    { name: 'Otakaro (Panel)',        l: 900,  d: 300, h: 320  },
+    { name: 'Geology (Longspan)',     l: 1060, d: 750, h: 500  },
+    { name: 'Vertebrate (Longspan)',  l: 2190, d: 750, h: 375  },
+    { name: 'Wet store (Panel)',      l: 900,  d: 250, h: 150  },
+    { name: 'Pallet Racking short',   l: 2700, d: 900, h: 900  },
+    { name: 'Pallet Racking tall',    l: 2700, d: 900, h: 1500 },
+    { name: 'Pallet tub',             l: 920,  d:1115, h:620   }
+  ],
+
+  /* ---- box presets (same units, offered as placeable containers) ---- */
+  boxPresets: [
+    { name: 'Box C',  l: 430, d: 280, h: 95  },
+    { name: 'Box D',  l: 435, d: 285, h: 190 },
+    { name: 'Box E',  l: 585, d: 435, h: 95  },
+    { name: 'Box F',  l: 585, d: 435, h: 190 },
+    { name: 'Box A1', l: 682, d: 427, h: 285 },
+    { name: 'Box A',  l: 685, d: 427, h: 145 },
+    { name: 'Box B',  l: 877, d: 432, h: 145 },
+    { name: 'Box B1', l: 877, d: 432, h: 285 },
+    { name: 'Box G',  l: 430, d: 280, h: 305 },
+    { name: 'Box H',  l: 215, d: 280, h: 305 }
+  ],
+
+  /* ---- typical CaPackyBara crate output (external dims) ----
+     Derived with the app's default allowances:
+       tray: footprint 895×790 internal + 18 mm side wall + 18 mm base + 0 lid
+       crate: + 30 mm sides, 150 mm base board, 18 mm top, 12 mm interlayer
+     Treat as starting points — regenerate exact dims from CaPackyBara. */
+  cratePresets: [
+    { name: 'ClipCrate tray 100 (ext)',   l: 931, d: 826, h: 118 },
+    { name: 'ClipCrate tray 200 (ext)',   l: 931, d: 826, h: 218 },
+    { name: 'ClipCrate 1×200 (ext)',      l: 991, d: 886, h: 386 },
+    { name: 'ClipCrate 2×200 (ext)',      l: 991, d: 886, h: 616 },
+    { name: 'ClipCrate 3×200 (ext)',      l: 991, d: 886, h: 846 }
+  ],
+
+  /* ---- tray internal footprints offered by CaPackyBara ---- */
+  trayFootprints: [
+    { label: 'ClipCrate',        l: 895, w: 790 },
+    { label: 'Half ClipCrate',   l: 440, w: 790 },
+    { label: 'Quarter ClipCrate', l: 440, w: 395 }
+  ],
+
+  /* ---- assumed object heights by nomenclature type (mm) ---- */
+  typeHeights: {
+    'pendant': 15,
+    'hei tiki': 20,
+    'hei-tiki': 20,
+    'heitiki': 20,
+    'tool': 50,
+    'adze': 50,
+    'chisel': 50,
+    'mere': 60,
+    'boulder': 150,
+    'modern': 45,
+    'raw': 100
+  },
+
+  /* ---- vehicle / lift presets for Otter Fit ----
+     Editable starting points, not measurements of specific vehicles. */
+  vehicles: [
+    { name: 'Lift car (large)', d: 4400, w: 2100, h: 2500, doorW: 1800, doorH: 2400 },
+    { name: 'Lift car (small)', d: 2500, w: 1600, h: 2200, doorW: 1100, doorH: 2100 },
+    { name: 'Cage van',         d: 4200, w: 1800, h: 1900, doorW: 1300, doorH: 1800 }
+    
+  ]
+};
+
+</script>
+
+
+
+<script type="module">
+// ---------------- shared three.js: one build for the whole suite ----------------
+let THREE = null;
+try { THREE = await import('three'); } catch (e) { THREE = null; }
+const threeOK = !!THREE;
+
+// ================= YOUR STANDARD BOXES (mm) (height is external)=================
+const builtinBoxes = [
+    { name: "Box C",  l: 430, w: 280, h: 95  },
+    { name: "Box D",  l: 435, w: 285, h: 190 },
+    { name: "Box E",  l: 585, w: 435, h: 95  },
+    { name: "Box F",  l: 585, w: 435, h: 190 },
+    { name: "Box A1", l: 682, w: 427, h: 285 },
+    { name: "Box A",  l: 685, w: 427, h: 145 },
+    { name: "Box B",  l: 877, w: 432, h: 145 },
+    { name: "Box B1", l: 877, w: 432, h: 285 },
+    { name: "Box G",  l: 430, w: 280, h: 305 },
+    { name: "Box H",  l: 215, w: 280, h: 305 }
+];
+// shared library wins over the built-in copy (clm-library.js — see README)
+const standardBoxes = (window.CLM_LIBRARY && CLM_LIBRARY.standardBoxes && CLM_LIBRARY.standardBoxes.length)
+    ? CLM_LIBRARY.standardBoxes
+    : builtinBoxes;
+const palette = ['#6e7a5e','#b25f43','#7c8fa0','#a68a5b','#8f4931','#556b5d','#c99a5b','#5c6b7a','#9c7b58','#4c5842','#a37a6c','#7d8a6a'];
+const colorMap = {};
+
+// ================= YOUR STORE PRESETS (mm) =================
+const builtinPresetsBase = [
+    { name: 'Hurunui (Panel)',        w: 900,  d: 450, h: 320,  type: 'shelf' },
+    { name: 'Waimakariri (Longspan)', w: 1800, d: 500, h: 340,  type: 'shelf' },
+    { name: 'Textiles 1 (Longspan)',  w: 1800, d: 900, h: 300,  type: 'shelf' },
+    { name: 'Textiles 2 (Longspan)',  w: 1800, d: 700, h: 300,  type: 'shelf' },
+    { name: 'Otakaro (Panel)',        w: 900,  d: 300, h: 320,  type: 'shelf' },
+    { name: 'Geology (Longspan)',     w: 1060, d: 750, h: 500,  type: 'shelf' },
+    { name: 'Vertebrate (Longspan)',  w: 2190, d: 750, h: 375,  type: 'shelf' },
+    { name: 'Wet store (Panel)',      w: 900,  d: 250, h: 150,  type: 'shelf' },
+    { name: 'Pallet Racking short',   w: 2700, d: 900, h: 900,  type: 'shelf' },
+    { name: 'Pallet Racking tall',    w: 2700, d: 900, h: 1500, type: 'shelf' },
+    { name: "Box C",  w: 430, d: 280, h: 95,  type: 'box' },
+    { name: "Box D",  w: 435, d: 285, h: 190, type: 'box' },
+    { name: "Box E",  w: 585, d: 435, h: 95,  type: 'box' },
+    { name: "Box F",  w: 585, d: 435, h: 190, type: 'box' },
+    { name: "Box A1", w: 682, d: 427, h: 285, type: 'box' },
+    { name: "Box A",  w: 685, d: 427, h: 145, type: 'box' },
+    { name: "Box B",  w: 877, d: 432, h: 145, type: 'box' },
+    { name: "Box B1", w: 877, d: 432, h: 285, type: 'box' },
+    { name: "Box G",  w: 430, d: 280, h: 305, type: 'box' },
+    { name: "Box H",  w: 215, d: 280, h: 305, type: 'box' }
+];
+// shared library presets (stores, boxes, CaPackyBara crates) — clm-library.js
+const libraryPresets = (window.CLM_LIBRARY ? [
+    ...(CLM_LIBRARY.shelfPresets || []).map(p => ({ name: p.name, w: p.l, d: p.d, h: p.h, type: 'shelf' })),
+    ...(CLM_LIBRARY.boxPresets || []).map(p => ({ name: p.name, w: p.l, d: p.d, h: p.h, type: 'box' })),
+    ...(CLM_LIBRARY.cratePresets || []).map(p => ({ name: p.name, w: p.l, d: p.d, h: p.h, type: 'box' })),
+] : []);
+const builtinPresets = [...builtinPresetsBase, ...libraryPresets];
+
+const LS_AUTOSAVE = 'msp-autosave';
+const LS_PLANS    = 'msp-plans';
+const LS_PRESETS  = 'msp-presets-v2'; // versioned so old test presets are discarded
+
+let storagePlan = [];
+let packResult = { shelves: [], tooBig: [] };
+let viewShelf = 0;
+let pendingManual = null;
+let packMode = 'shelf'; // 'shelf' = boxes onto a shelf, 'box' = items into a box
+
+// ================= THREE.JS SETUP =================
+let scene, camera, renderer, itemsGroup, shelfGroup, raycaster, pointerNDC;
+let meshes = [];
+let theta = Math.PI / 4, phi = Math.PI / 3.2, dist = 3000;
+const target = threeOK ? new THREE.Vector3() : null;
+
+let dragMode = null;
+let dragMesh = null, dragOrig = null, dragCand = null, dragValid = false, dragY = 0;
+const dragPlane = threeOK ? new THREE.Plane() : null;
+const dragPoint = threeOK ? new THREE.Vector3() : null;
+const dragOffset = { x: 0, z: 0 };
+let selectedMesh = null;
+const SEL_EMISSIVE = 0x3c4a52;
+
+function init3D() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xefe9dd);
+    camera = new THREE.PerspectiveCamera(45, 1, 1, 100000);
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('viewer'), antialias: true });
+    scene.add(new THREE.AmbientLight(0xfff4e0, 0.8));
+    const dir = new THREE.DirectionalLight(0xfff4e0, 0.4);
+    dir.position.set(1, 2, 1.5);
+    scene.add(dir);
+    shelfGroup = new THREE.Group();
+    itemsGroup = new THREE.Group();
+    scene.add(shelfGroup, itemsGroup);
+    raycaster = new THREE.Raycaster();
+    pointerNDC = new THREE.Vector2();
+
+    const canvas = renderer.domElement;
+    let lx = 0, ly = 0;
+
+    canvas.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        canvas.setPointerCapture(e.pointerId);
+        lx = e.clientX; ly = e.clientY;
+        const hit = pick(e);
+        if (hit) {
+            dragMode = 'box';
+            dragMesh = hit;
+            select(hit);
+            const p = hit.userData;
+            dragOrig = { x: p.x, z: p.z, y: p.y };
+            dragCand = null; dragValid = false;
+            dragPlane.set(new THREE.Vector3(0, 1, 0), -p.y);
+            const pt = rayToPoint(e);
+            if (pt) { dragOffset.x = (p.x + p.l / 2) - pt.x; dragOffset.z = (p.z + p.w / 2) - pt.z; }
+            hideTip();
+        } else {
+            dragMode = 'camera';
+            select(null);
+        }
+    });
+
+    canvas.addEventListener('pointerup', () => {
+        if (dragMode === 'box' && dragMesh) {
+            const p = dragMesh.userData;
+            if (dragValid && dragCand) {
+                p.x = dragCand.x; p.z = dragCand.z; p.y = dragY; p.manual = true;
+            } else {
+                p.x = dragOrig.x; p.z = dragOrig.z; p.y = dragOrig.y;
+            }
+            dragMesh.position.set(p.x + p.l / 2, p.y + p.h / 2, p.z + p.w / 2);
+            dragMesh.material.emissive.setHex(dragMesh === selectedMesh ? SEL_EMISSIVE : 0x000000);
+            updateStats(); updateOverview(); highlightOverview(); autosave();
+        }
+        dragMode = null; dragMesh = null; dragCand = null;
+    });
+
+    canvas.addEventListener('pointermove', e => {
+        if (dragMode === 'box' && dragMesh) {
+            const pt = rayToPoint(e);
+            if (!pt) return;
+            const shelf = getShelf();
+            const p = dragMesh.userData;
+            let nx = pt.x + dragOffset.x - p.l / 2;
+            let nz = pt.z + dragOffset.z - p.w / 2;
+            nx = Math.max(0, Math.min(shelf.w - p.l, nx));
+            nz = Math.max(0, Math.min(shelf.d - p.w, nz));
+            const drop = computeDrop(p, nx, nz);
+            dragValid = drop.valid; dragY = drop.y; dragCand = { x: nx, z: nz };
+            dragMesh.position.set(nx + p.l / 2, drop.y + p.h / 2, nz + p.w / 2);
+            dragMesh.material.emissive.setHex(drop.valid ? 0x4b5940 : 0xff0000);
+            hideTip();
+            updateCamera();
+        } else if (dragMode === 'camera') {
+            theta -= (e.clientX - lx) * 0.006;
+            phi = Math.min(1.45, Math.max(0.15, phi - (e.clientY - ly) * 0.006));
+            lx = e.clientX; ly = e.clientY;
+            hideTip(); updateCamera();
+        } else {
+            hover(e);
+        }
+    });
+
+    canvas.addEventListener('wheel', e => { e.preventDefault(); dist = Math.min(20000, Math.max(300, dist * (1 + e.deltaY * 0.001))); updateCamera(); }, { passive: false });
+    window.addEventListener('resize', resizeRenderer);
+    resizeRenderer();
+}
+
+function pick(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNDC, camera);
+    const hits = raycaster.intersectObjects(meshes, false);
+    return hits.length ? hits[0].object : null;
+}
+
+function rayToPoint(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNDC, camera);
+    return raycaster.ray.intersectPlane(dragPlane, dragPoint) ? dragPoint : null;
+}
+
+function select(mesh) {
+    if (selectedMesh && selectedMesh !== mesh) selectedMesh.material.emissive.setHex(0x000000);
+    selectedMesh = mesh;
+    if (mesh) mesh.material.emissive.setHex(SEL_EMISSIVE);
+}
+
+function computeDrop(p, x, z) {
+    const shelf = getShelf();
+    const placements = packResult.shelves[viewShelf] || [];
+    const l = p.l, w = p.w, h = p.h, T = 1;
+    let y = 0;
+    for (const q of placements) {
+        if (q === p) continue;
+        if (q.x <= x + T && x + l <= q.x + q.l + T && q.z <= z + T && z + w <= q.z + q.w + T) {
+            if (q.y + q.h > y) y = q.y + q.h;
+        }
+    }
+    let valid = y + h <= shelf.h + T;
+    if (valid) {
+        for (const q of placements) {
+            if (q === p) continue;
+            const ox = x < q.x + q.l - T && q.x < x + l - T;
+            const oz = z < q.z + q.w - T && q.z < z + w - T;
+            if (ox && oz && y < q.y + q.h - T && q.y < y + h - T) { valid = false; break; }
+        }
+    }
+    return { y, valid };
+}
+
+function rotateSelected() {
+    if (!selectedMesh) return;
+    const p = selectedMesh.userData;
+    const shelf = getShelf();
+    const orig = { l: p.l, w: p.w };
+    p.l = orig.w; p.w = orig.l;
+    const nx = Math.max(0, Math.min(shelf.w - p.l, p.x));
+    const nz = Math.max(0, Math.min(shelf.d - p.w, p.z));
+    const drop = computeDrop(p, nx, nz);
+    if (drop.valid) {
+        p.x = nx; p.z = nz; p.y = drop.y; p.manual = true;
+        buildScene();
+        const m = meshes.find(m => m.userData === p);
+        select(m || null);
+        updateStats(); updateOverview(); highlightOverview(); autosave();
+    } else {
+        p.l = orig.l; p.w = orig.w;
+    }
+}
+
+function resizeRenderer() {
+    const w = renderer.domElement.parentElement.clientWidth;
+    renderer.setSize(w, 480);
+    camera.aspect = w / 480;
+    camera.updateProjectionMatrix();
+    updateCamera();
+}
+
+function updateCamera() {
+    camera.position.set(
+        target.x + dist * Math.sin(phi) * Math.cos(theta),
+        target.y + dist * Math.cos(phi),
+        target.z + dist * Math.sin(phi) * Math.sin(theta)
+    );
+    camera.lookAt(target);
+    renderer.render(scene, camera);
+}
+
+function hover(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNDC, camera);
+    const hits = raycaster.intersectObjects(meshes, false);
+    if (hits.length) {
+        const d = hits[0].object.userData;
+        const tip = document.getElementById('tooltip');
+        tip.style.display = 'block';
+        tip.style.left = (e.clientX - rect.left + 14) + 'px';
+        tip.style.top = (e.clientY - rect.top + 14) + 'px';
+        tip.textContent = `${d.name} — ${d.l} × ${d.w} × ${d.h} mm${d.manual ? ' (manual)' : ''}`;
+    } else hideTip();
+}
+function hideTip() { document.getElementById('tooltip').style.display = 'none'; }
+
+function getColor(name) {
+    if (!(name in colorMap)) colorMap[name] = palette[Object.keys(colorMap).length % palette.length];
+    return colorMap[name];
+}
+
+function buildScene() {
+    if (!threeOK) return;
+    const shelf = getShelf();
+    [shelfGroup, itemsGroup].forEach(g => {
+        while (g.children.length) {
+            const c = g.children.pop();
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) c.material.dispose();
+        }
+    });
+    meshes = [];
+    selectedMesh = null;
+
+    if (shelf.w > 0 && shelf.d > 0 && shelf.h > 0) {
+        const edges = new THREE.LineSegments(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(shelf.w, shelf.h, shelf.d)),
+            new THREE.LineBasicMaterial({ color: 0x554d3f })
+        );
+        edges.position.set(shelf.w / 2, shelf.h / 2, shelf.d / 2);
+        shelfGroup.add(edges);
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(shelf.w, shelf.d),
+            new THREE.MeshLambertMaterial({ color: 0xddd3bf })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(shelf.w / 2, 0, shelf.d / 2);
+        shelfGroup.add(floor);
+
+        const placements = packResult.shelves[viewShelf] || [];
+        placements.forEach(p => {
+            const gap = 4;
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(Math.max(1, p.l - gap), Math.max(1, p.h - gap), Math.max(1, p.w - gap)),
+                new THREE.MeshLambertMaterial({ color: getColor(p.name) })
+            );
+            mesh.position.set(p.x + p.l / 2, p.y + p.h / 2, p.z + p.w / 2);
+            mesh.userData = p;
+            mesh.add(new THREE.LineSegments(
+                new THREE.EdgesGeometry(mesh.geometry),
+                new THREE.LineBasicMaterial({ color: 0xffffff })
+            ));
+            itemsGroup.add(mesh);
+            meshes.push(mesh);
+        });
+
+        target.set(shelf.w / 2, shelf.h / 2, shelf.d / 2);
+        dist = Math.max(shelf.w, shelf.d, shelf.h) * 2.1;
+    }
+    updateCamera();
+}
+
+// ================= PACKING =================
+function fitsEmpty(shelf, u) {
+    const fp = (u.l <= shelf.w && u.w <= shelf.d) || (u.w <= shelf.w && u.l <= shelf.d);
+    return fp && u.h <= shelf.h;
+}
+
+function makeSupport(x, z, l, w, y, single) {
+    return single
+        ? { x, z, l, w, y, gaps: [{ x: 0, w: l }] }
+        : { x, z, l, w, y, spaces: [{ x: 0, z: 0, w: l, d: w }] };
+}
+
+function subtractRect(spaces, r) {
+    const out = [];
+    for (const s of spaces) {
+        if (r.x >= s.x + s.w || r.x + r.w <= s.x || r.z >= s.z + s.d || r.z + r.d <= s.z) { out.push(s); continue; }
+        if (r.x > s.x) out.push({ x: s.x, z: s.z, w: r.x - s.x, d: s.d });
+        if (r.x + r.w < s.x + s.w) out.push({ x: r.x + r.w, z: s.z, w: s.x + s.w - (r.x + r.w), d: s.d });
+        const ox = Math.min(s.x + s.w, r.x + r.w) - Math.max(s.x, r.x);
+        if (r.z > s.z) out.push({ x: Math.max(s.x, r.x), z: s.z, w: ox, d: r.z - s.z });
+        if (r.z + r.d < s.z + s.d) out.push({ x: Math.max(s.x, r.x), z: r.z + r.d, w: ox, d: s.z + s.d - (r.z + r.d) });
+    }
+    return out.filter(s => s.w >= 50 && s.d >= 50);
+}
+
+function subtractGap(gaps, x0, w0) {
+    const out = [];
+    for (const g of gaps) {
+        const gx2 = g.x + g.w, x2 = x0 + w0;
+        if (x2 <= g.x || x0 >= gx2) { out.push(g); continue; }
+        if (x0 > g.x) out.push({ x: g.x, w: Math.min(x0, gx2) - g.x });
+        if (x2 < gx2) out.push({ x: Math.max(x2, g.x), w: gx2 - Math.max(x2, g.x) });
+    }
+    return out.filter(g => g.w >= 50);
+}
+
+function findSpotDeep(sup, u) {
+    let best = null;
+    for (let i = 0; i < sup.spaces.length; i++) {
+        const s = sup.spaces[i];
+        for (const [L, W] of [[u.l, u.w], [u.w, u.l]]) {
+            if (L <= s.w && W <= s.d) {
+                const tiles = Math.floor(s.w / L) * Math.floor(s.d / W);
+                const waste = (s.w - L) + (s.d - W);
+                if (!best || tiles > best.tiles || (tiles === best.tiles && waste < best.waste)) {
+                    best = { i, sx: s.x, sz: s.z, L, W, tiles, waste };
+                }
+            }
+        }
+    }
+    return best;
+}
+
+function findSpotSingle(sup, u) {
+    const opts = [];
+    if (u.w <= sup.w) opts.push({ L: u.l, W: u.w });
+    if (u.l <= sup.w) opts.push({ L: u.w, W: u.l });
+    opts.forEach(o => o.tiles = Math.floor(sup.l / o.L));
+    let best = null;
+    for (const o of opts) for (let gi = 0; gi < sup.gaps.length; gi++) {
+        const g = sup.gaps[gi];
+        if (g.w >= o.L) {
+            const waste = g.w - o.L;
+            if (!best || o.tiles > best.tiles || (o.tiles === best.tiles && waste < best.waste)) {
+                best = { gi, sx: g.x, sz: 0, L: o.L, W: o.W, tiles: o.tiles, waste };
+            }
+        }
+    }
+    return best;
+}
+
+function packShelf(shelf, units, single, fixed, singleHeight) {
+    const placements = [], unplaced = [];
+    const supports = [makeSupport(0, 0, shelf.w, shelf.d, 0, single)];
+    const E = 1;
+
+    const demoted = [];
+    const sortedFixed = [...(fixed || [])].sort((a, b) => a.y - b.y);
+    for (const f of sortedFixed) {
+        if (!fitsEmpty(shelf, f)) { demoted.push(f); continue; }
+        const sup = supports.find(s => Math.abs(s.y - f.y) < E &&
+            f.x >= s.x - E && f.x + f.l <= s.x + s.l + E &&
+            f.z >= s.z - E && f.z + f.w <= s.z + s.w + E);
+        let ok = false;
+        if (sup) {
+            ok = single
+                ? sup.gaps.some(g => f.x >= sup.x + g.x - E && f.x + f.l <= sup.x + g.x + g.w + E)
+                : sup.spaces.some(s2 =>
+                    f.x >= sup.x + s2.x - E && f.x + f.l <= sup.x + s2.x + s2.w + E &&
+                    f.z >= sup.z + s2.z - E && f.z + f.w <= sup.z + s2.z + s2.d + E);
+        }
+        if (!ok) { demoted.push(f); continue; }
+        if (single) sup.gaps = subtractGap(sup.gaps, f.x - sup.x, f.l);
+        else sup.spaces = subtractRect(sup.spaces, { x: f.x - sup.x, z: f.z - sup.z, w: f.l, d: f.w });
+        placements.push({ x: f.x, z: f.z, y: f.y, l: f.l, w: f.w, h: f.h, name: f.name, manual: true });
+        if (!singleHeight) supports.push(makeSupport(f.x, f.z, f.l, f.w, f.y + f.h, single));
+    }
+
+    const sorted = [...demoted, ...units].sort((a, b) => (b.l * b.w - a.l * a.w) || (b.h - a.h));
+    for (const u of sorted) {
+        let best = null;
+        for (const sup of supports) {
+            if (sup.y + u.h > shelf.h) continue;
+            const spot = single ? findSpotSingle(sup, u) : findSpotDeep(sup, u);
+            if (!spot) continue;
+            if (!best || sup.y < best.sup.y ||
+                (sup.y === best.sup.y && (spot.tiles > best.spot.tiles ||
+                 (spot.tiles === best.spot.tiles && spot.waste < best.spot.waste)))) {
+                best = { sup, spot };
+            }
+        }
+        if (!best) { unplaced.push(u); continue; }
+
+        const sup = best.sup, spot = best.spot;
+        const p = { x: sup.x + spot.sx, z: sup.z + spot.sz, y: sup.y, l: spot.L, w: spot.W, h: u.h, name: u.name };
+        placements.push(p);
+
+        if (single) {
+            const g = sup.gaps[spot.gi];
+            const rest = g.w - spot.L;
+            sup.gaps.splice(spot.gi, 1, ...(rest >= 50 ? [{ x: g.x + spot.L, w: rest }] : []));
+        } else {
+            const s = sup.spaces[spot.i];
+            const ns = [];
+            if (s.w - spot.L >= 50) ns.push({ x: s.x + spot.L, z: s.z, w: s.w - spot.L, d: s.d });
+            if (s.d - spot.W >= 50) ns.push({ x: s.x, z: s.z + spot.W, w: spot.L, d: s.d - spot.W });
+            sup.spaces.splice(spot.i, 1, ...ns);
+        }
+        if (!singleHeight) supports.push(makeSupport(p.x, p.z, p.l, p.w, p.y + u.h, single));
+    }
+    return { placements, unplaced };
+}
+
+function collectManual() {
+    const out = [];
+    (packResult.shelves || []).forEach((pl, si) => pl.forEach(p => {
+        if (p.manual) out.push({ s: si, name: p.name, l: p.l, w: p.w, h: p.h, x: p.x, y: p.y, z: p.z });
+    }));
+    return out;
+}
+
+function recalcAll() {
+    const shelf = getShelf();
+    const single = document.getElementById('single-toggle').checked;
+    const singleHeight = document.getElementById('single-height-toggle').checked;
+    const fixed = pendingManual !== null ? pendingManual : collectManual();
+    pendingManual = null;
+
+    const need = {};
+    storagePlan.forEach(it => need[it.name] = (need[it.name] || 0) + it.qty);
+
+    const usedCount = {}, fixedUse = [];
+    fixed.forEach(f => {
+        if ((usedCount[f.name] || 0) < (need[f.name] || 0) && fitsEmpty(shelf, f)) {
+            usedCount[f.name] = (usedCount[f.name] || 0) + 1;
+            fixedUse.push(f);
+        }
+    });
+
+    const autoUnits = [], tooBig = [];
+    storagePlan.forEach(it => {
+        const autoCount = it.qty - (usedCount[it.name] || 0);
+        for (let i = 0; i < autoCount; i++) {
+            const u = { name: it.name, l: it.l, w: it.w, h: it.h };
+            (fitsEmpty(shelf, u) ? autoUnits : tooBig).push(u);
+        }
+    });
+
+    const shelves = [];
+    let remaining = autoUnits;
+    const maxFixedShelf = fixedUse.length ? Math.max(...fixedUse.map(f => f.s)) : -1;
+    let i = 0;
+    while (i < 99) {
+        const r = packShelf(shelf, remaining, single, fixedUse.filter(f => f.s === i), singleHeight);
+        shelves.push(r.placements);
+        remaining = r.unplaced;
+        if (!remaining.length && i >= maxFixedShelf) break;
+        i++;
+    }
+
+    packResult = { shelves, tooBig };
+    viewShelf = 0;
+    updateTable(); updateSummary(); updateOverview(); syncView();
+    autosave();
+}
+
+// ================= PERSISTENCE =================
+function num(v, dflt) { return CLM_CORE.dims.num(v, dflt); }
+
+function currentState() {
+    return {
+        app: 'museum-storage-planner',
+        version: 3,
+        name: document.getElementById('plan-name').value.trim() || 'Untitled plan',
+        shelf: getShelf(),
+        singleDepth: document.getElementById('single-toggle').checked,
+        singleHeight: document.getElementById('single-height-toggle').checked,
+        packMode: packMode,
+        items: storagePlan,
+        manual: collectManual()
+    };
+}
+
+function autosave() {
+    CLM_CORE.store.setLS(LS_AUTOSAVE, currentState());
+}
+
+function validItem(it) {
+    return it && typeof it === 'object' && it.name &&
+        num(it.l, 0) > 0 && num(it.w, 0) > 0 && num(it.h, 0) > 0 && num(it.qty, 0) >= 1;
+}
+
+function applyState(data) {
+    if (!data || typeof data !== 'object') return false;
+    const s = data.shelf || {};
+    document.getElementById('shelf-w').value = num(s.w, 1200);
+    document.getElementById('shelf-d').value = num(s.d, 600);
+    document.getElementById('shelf-h').value = num(s.h, 400);
+    document.getElementById('single-toggle').checked = !!data.singleDepth;
+    document.getElementById('single-height-toggle').checked = !!data.singleHeight;
+    applyMode(data.packMode === 'box' ? 'box' : 'shelf');
+    storagePlan = Array.isArray(data.items) ? data.items.filter(validItem).map(it => ({
+        name: String(it.name), l: num(it.l, 0), w: num(it.w, 0), h: num(it.h, 0), qty: Math.floor(num(it.qty, 1))
+    })) : [];
+    document.getElementById('plan-name').value = data.name ? String(data.name) : 'Untitled plan';
+    pendingManual = Array.isArray(data.manual) ? data.manual.filter(m => m && m.name).map(m => ({
+        s: Math.floor(num(m.s, 0)), name: String(m.name), l: num(m.l, 0), w: num(m.w, 0), h: num(m.h, 0),
+        x: num(m.x, 0), y: num(m.y, 0), z: num(m.z, 0)
+    })) : [];
+    recalcAll();
+    return true;
+}
+
+function getPlans() { return CLM_CORE.store.getLS(LS_PLANS, {}); }
+function setPlans(p) { CLM_CORE.store.setLS(LS_PLANS, p); }
+
+function refreshPlanList() {
+    const sel = document.getElementById('plan-open');
+    sel.innerHTML = '<option value="">— open a saved plan —</option>';
+    Object.keys(getPlans()).sort().forEach(n => {
+        const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
+    });
+}
+
+function getUserPresets() { return CLM_CORE.store.getLS(LS_PRESETS, []); }
+function setUserPresets(p) { CLM_CORE.store.setLS(LS_PRESETS, p); }
+function allPresets() {
+    const map = new Map();
+    builtinPresets.forEach(p => map.set(p.name, p));
+    getUserPresets().forEach(p => map.set(p.name, p));
+    return [...map.values()];
+}
+function refreshPresetSelect() {
+    const sel = document.getElementById('preset-select');
+    const noun = packMode === 'box' ? 'box' : 'shelf';
+    sel.innerHTML = `<option value="">— apply a ${noun} preset —</option>`;
+    allPresets()
+        .filter(p => (p.type || 'shelf') === packMode)
+        .forEach(p => {
+            const o = document.createElement('option'); o.value = p.name;
+            o.textContent = `${p.name} — ${p.w} × ${p.d} × ${p.h}`;
+            sel.appendChild(o);
+        });
+}
+
+function applyMode(mode) {
+    packMode = mode === 'box' ? 'box' : 'shelf';
+    const noun = packMode === 'box' ? 'box' : 'shelf';
+    const Noun = packMode === 'box' ? 'Box' : 'Shelf';
+    const nounPlural = packMode === 'box' ? 'Boxes' : 'Shelves';
+    document.getElementById('mode-shelf').classList.toggle('active', packMode === 'shelf');
+    document.getElementById('mode-box').classList.toggle('active', packMode === 'box');
+    document.getElementById('container-heading').textContent = `2. ${Noun} Specifications`;
+    document.getElementById('preset-label').textContent = `${Noun} presets`;
+    document.getElementById('total-shelves-label').textContent = `${nounPlural} Required`;
+    document.getElementById('stat-items-label-text').textContent = `Items on this ${noun}:`;
+    document.getElementById('overview-heading').textContent = `6. ${Noun} Loading Overview`;
+    document.getElementById('overview-col-header').textContent = Noun;
+    document.getElementById('overview-hint').innerHTML =
+        `Click a row to view that ${noun} in 3D. Thumbnails show the ${noun} from the side (width &times; height) and top (width &times; depth).`;
+    refreshPresetSelect();
+    syncView();
+    updateSummary();
+    updateOverview();
+}
+
+// ================= SIDE-VIEW THUMBNAILS =================
+function sideViewSVG(placements, shelf) {
+    const W = Math.max(1, shelf.w), H = Math.max(1, shelf.h);
+    const sw = Math.max(W, H) / 150;
+    let rects = '';
+    placements.forEach(p => {
+        const ySvg = H - (p.y + p.h);
+        rects += `<rect x="${p.x}" y="${ySvg}" width="${p.l}" height="${p.h}" fill="${getColor(p.name)}" stroke="#ffffff" stroke-width="${sw}" opacity="0.95"></rect>`;
+    });
+    return `<svg class="thumb-svg" width="180" height="72" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">` +
+        `<rect x="${sw/2}" y="${sw/2}" width="${W-sw}" height="${H-sw}" fill="none" stroke="#34495e" stroke-width="${sw}"></rect>` +
+        rects + `</svg>`;
+}
+
+function topViewSVG(placements, shelf) {
+    const W = Math.max(1, shelf.w), D = Math.max(1, shelf.d);
+    const sw = Math.max(W, D) / 150;
+    let rects = '';
+    placements.forEach(p => {
+        rects += `<rect x="${p.x}" y="${p.z}" width="${p.l}" height="${p.w}" fill="${getColor(p.name)}" stroke="#ffffff" stroke-width="${sw}" opacity="0.95"></rect>`;
+    });
+    return `<svg class="thumb-svg" width="180" height="72" viewBox="0 0 ${W} ${D}" preserveAspectRatio="none">` +
+        `<rect x="${sw/2}" y="${sw/2}" width="${W-sw}" height="${D-sw}" fill="none" stroke="#34495e" stroke-width="${sw}"></rect>` +
+        rects + `</svg>`;
+}
+
+// ================= UI / STATE =================
+function getShelf() {
+    return {
+        w: parseFloat(document.getElementById('shelf-w').value) || 0,
+        d: parseFloat(document.getElementById('shelf-d').value) || 0,
+        h: parseFloat(document.getElementById('shelf-h').value) || 0
+    };
+}
+
+function syncView() {
+    const count = Math.max(1, packResult.shelves.length);
+    if (viewShelf > count - 1) viewShelf = count - 1;
+    const Noun = packMode === 'box' ? 'Box' : 'Shelf';
+    document.getElementById('shelf-label').textContent = `${Noun} ${viewShelf + 1} of ${count}`;
+    document.getElementById('prev-shelf').disabled = viewShelf === 0;
+    document.getElementById('next-shelf').disabled = viewShelf >= count - 1;
+    buildScene();
+    updateStats();
+    highlightOverview();
+}
+
+function updateTable() {
+    const tbody = document.querySelector('#plan-table tbody');
+    tbody.innerHTML = '';
+    storagePlan.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="chip" style="background:${getColor(item.name)}"></span><strong>${item.name}</strong></td>
+            <td>${item.qty}</td>
+            <td>${item.l} × ${item.w} × ${item.h}</td>
+            <td><button class="btn btn-danger delete-btn" data-index="${index}">Remove</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            storagePlan.splice(parseInt(e.target.getAttribute('data-index')), 1);
+            recalcAll();
+        });
+    });
+}
+
+function updateSummary() {
+    document.getElementById('total-items').innerText = storagePlan.reduce((s, i) => s + i.qty, 0);
+    document.getElementById('total-shelves').innerText = packResult.shelves.length;
+    const tb = document.getElementById('toobig-box');
+    if (packResult.tooBig.length) {
+        const counts = {};
+        packResult.tooBig.forEach(u => counts[u.name] = (counts[u.name] || 0) + 1);
+        tb.style.display = 'block';
+        tb.innerHTML = `<strong>Too large for this ${packMode === 'box' ? 'box' : 'shelf'} spec:</strong> ` +
+            Object.entries(counts).map(([n, c]) => `${c} × ${n}`).join(', ') +
+            `. Try a larger ${packMode === 'box' ? 'box' : 'bay or racking'}.`;
+    } else tb.style.display = 'none';
+}
+
+function updateOverview() {
+    const tbody = document.querySelector('#overview-table tbody');
+    tbody.innerHTML = '';
+    const shelf = getShelf();
+    if (!packResult.shelves.length) {
+        tbody.innerHTML = '<tr style="cursor:default;"><td colspan="7" style="text-align:center; color:var(--ink-soft);">No items in plan yet.</td></tr>';
+        return;
+    }
+    packResult.shelves.forEach((placements, i) => {
+        const counts = {};
+        placements.forEach(p => counts[p.name] = (counts[p.name] || 0) + 1);
+        const summary = Object.entries(counts).map(([n, c]) => `${c} × ${n}`).join(', ');
+        const vol = placements.reduce((s, p) => s + p.l * p.w * p.h, 0);
+        const util = shelf.w * shelf.d * shelf.h > 0 ? Math.round(vol / (shelf.w * shelf.d * shelf.h) * 100) : 0;
+        const tiers = new Set(placements.map(p => p.y)).size;
+        const Noun = packMode === 'box' ? 'Box' : 'Shelf';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><strong>${Noun} ${i + 1}</strong></td><td>${sideViewSVG(placements, shelf)}</td><td>${topViewSVG(placements, shelf)}</td><td>${summary}</td><td>${placements.length}</td><td>${tiers}</td><td>${util}%</td>`;
+        tr.addEventListener('click', () => { viewShelf = i; syncView(); });
+        tbody.appendChild(tr);
+    });
+}
+
+function highlightOverview() {
+    if (!packResult.shelves.length) return;
+    document.querySelectorAll('#overview-table tbody tr').forEach((tr, i) => {
+        tr.classList.toggle('active-row', i === viewShelf);
+    });
+}
+
+function updateStats() {
+    const shelf = getShelf();
+    const placements = packResult.shelves[viewShelf] || [];
+    const vol = placements.reduce((s, p) => s + p.l * p.w * p.h, 0);
+    const util = shelf.w * shelf.d * shelf.h > 0 ? Math.round(vol / (shelf.w * shelf.d * shelf.h) * 100) : 0;
+    document.getElementById('stat-util').innerText = util + '%';
+    document.getElementById('stat-items').innerText = placements.length;
+    document.getElementById('stat-levels').innerText = new Set(placements.map(p => p.y)).size;
+}
+
+function syncCustomVisibility() {
+    document.getElementById('custom-inputs').style.display =
+        document.getElementById('box-select').value === 'custom' ? 'grid' : 'none';
+}
+
+// ================= CLM/1 SUITE HAND-OFF (shared across suite apps) =================
+function exportCLM() {
+    const planName = document.getElementById('plan-name').value.trim() || 'Untitled plan';
+    const shelf = getShelf();
+    const Noun = packMode === 'box' ? 'Box' : 'Shelf';
+    const containers = [], items = [];
+
+    packResult.shelves.forEach((placements, i) => {
+        const cid = `${planName} — ${Noun} ${i + 1}`;
+        containers.push({
+            id: cid,
+            kind: packMode === 'box' ? 'box' : 'shelf',
+            l: shelf.w, w: shelf.d, h: shelf.h,
+            external: false
+        });
+        placements.forEach((p, k) => {
+            items.push({
+                id: `${p.name}#${i + 1}.${k + 1}`,
+                name: p.name,
+                dims: { l: p.l, w: p.w, h: p.h },
+                placement: { container: cid, x: p.x, y: p.y, z: p.z, rot: 0 }
+            });
+        });
+    });
+
+    packResult.tooBig.forEach((u, k) => {
+        items.push({
+            id: `${u.name}#toobig.${k + 1}`,
+            name: u.name,
+            dims: { l: u.l, w: u.w, h: u.h },
+            notes: `exceeds ${Noun.toLowerCase()} spec`
+        });
+    });
+
+    const m = CLM.make(planName, 'stick-it-on-a-shelf', items, containers, []);
+    CLM.download(m, planName.replace(/[^\w\-]+/g, '_') + '-manifest.json');
+    CLM.handoff(m);
+}
+
+function loadCLMManifest(m) {
+    let added = 0;
+    const units = m.containers.filter(c => c && (c.kind === 'crate' || c.kind === 'box' || c.kind === 'tray')
+        && num(c.l, 0) > 0 && num(c.w, 0) > 0 && num(c.h, 0) > 0);
+
+    if (units.length) {
+        units.forEach(c => {
+            storagePlan.push({ name: String(c.id), l: c.l, w: c.w, h: c.h, qty: 1 });
+            added++;
+        });
+    } else {
+        const agg = {};
+        (m.items || []).forEach(it => {
+            if (!it || !it.dims) return;
+            const l = num(it.dims.l, 0), w = num(it.dims.w, 0), h = num(it.dims.h, 0);
+            if (l <= 0 || w <= 0 || h <= 0) return;
+            const key = `${it.name}|${l}|${w}|${h}`;
+            if (!agg[key]) agg[key] = { name: String(it.name), l, w, h, qty: 0 };
+            agg[key].qty++;
+        });
+        Object.values(agg).forEach(v => { storagePlan.push(v); added++; });
+    }
+
+    if (!added) { alert('Manifest has no placeable units.'); return; }
+
+    const planInput = document.getElementById('plan-name');
+    if (planInput.value.trim() === 'Untitled plan' && m.project) planInput.value = String(m.project);
+    recalcAll();
+    alert(`Added ${added} unit(s) from manifest \u201c${m.project || 'Untitled'}\u201d` +
+        (units.length ? ' — crates/boxes from the packing stage.' : ' — items from the manifest.'));
+}
+
+function handleCLMFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            loadCLMManifest(CLM.parse(reader.result));
+        } catch (err) {
+            alert('Not a valid clm/1 manifest: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// ================= EVENTS =================
+function bootApp() {
+    const boxSelect = document.getElementById('box-select');
+
+    standardBoxes.forEach(box => {
+        const opt = document.createElement('option');
+        opt.value = box.name;
+        opt.textContent = `${box.name} (${box.l} × ${box.w} × ${box.h} mm)`;
+        boxSelect.appendChild(opt);
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = '-- Custom Artefact --';
+    boxSelect.appendChild(customOpt);
+
+    boxSelect.addEventListener('change', syncCustomVisibility);
+    syncCustomVisibility();
+
+    document.getElementById('add-btn').addEventListener('click', () => {
+        const qty = parseInt(document.getElementById('item-qty').value) || 0;
+        if (qty <= 0) { alert('Please enter a quantity of at least 1.'); return; }
+        let item;
+        if (boxSelect.value === 'custom') {
+            const l = parseFloat(document.getElementById('custom-l').value) || 0;
+            const w = parseFloat(document.getElementById('custom-w').value) || 0;
+            const h = parseFloat(document.getElementById('custom-h').value) || 0;
+            if (l <= 0 || w <= 0 || h <= 0) { alert('Please enter valid custom dimensions.'); return; }
+            const label = document.getElementById('custom-name').value.trim() || 'Custom Artefact';
+            item = { name: label, l, w, h, qty };
+        } else {
+            const b = standardBoxes.find(b => b.name === boxSelect.value);
+            item = { ...b, qty };
+        }
+        storagePlan.push(item);
+        document.getElementById('item-qty').value = 1;
+        recalcAll();
+    });
+
+    document.getElementById('clear-btn').addEventListener('click', () => { storagePlan = []; recalcAll(); });
+    document.getElementById('prev-shelf').addEventListener('click', () => { viewShelf--; syncView(); });
+    document.getElementById('next-shelf').addEventListener('click', () => { viewShelf++; syncView(); });
+    document.getElementById('single-toggle').addEventListener('change', recalcAll);
+    document.getElementById('single-height-toggle').addEventListener('change', recalcAll);
+    document.querySelectorAll('#shelf-w, #shelf-d, #shelf-h').forEach(i => i.addEventListener('input', recalcAll));
+
+    document.getElementById('rotate-btn').addEventListener('click', rotateSelected);
+    document.getElementById('repack-btn').addEventListener('click', () => { pendingManual = []; recalcAll(); });
+    document.addEventListener('keydown', e => {
+        const tag = (document.activeElement && document.activeElement.tagName) || '';
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+        if (e.key === 'r' || e.key === 'R') rotateSelected();
+    });
+
+    document.getElementById('plan-name').addEventListener('input', autosave);
+
+    document.getElementById('plan-save').addEventListener('click', () => {
+        const name = document.getElementById('plan-name').value.trim() || 'Untitled plan';
+        const plans = getPlans();
+        plans[name] = currentState();
+        setPlans(plans);
+        refreshPlanList();
+        autosave();
+    });
+
+    document.getElementById('plan-open-btn').addEventListener('click', () => {
+        const name = document.getElementById('plan-open').value;
+        if (!name) return;
+        const plans = getPlans();
+        if (plans[name]) applyState(plans[name]);
+    });
+
+    document.getElementById('plan-delete').addEventListener('click', () => {
+        const name = document.getElementById('plan-open').value;
+        if (!name) return;
+        if (!confirm(`Delete saved plan "${name}"? This cannot be undone.`)) return;
+        const plans = getPlans();
+        delete plans[name];
+        setPlans(plans);
+        refreshPlanList();
+    });
+
+    document.getElementById('plan-new').addEventListener('click', () => {
+        if (storagePlan.length && !confirm('Start a new plan? Current unsaved changes will be lost.')) return;
+        storagePlan = [];
+        document.getElementById('plan-name').value = 'Untitled plan';
+        pendingManual = [];
+        recalcAll();
+    });
+
+    document.getElementById('file-export').addEventListener('click', () => {
+        const data = currentState();
+        CLM_CORE.export.downloadJSON((data.name || 'plan').replace(/[^\w\-]+/g, '_') + '.json', data);
+    });
+
+    document.getElementById('file-import-btn').addEventListener('click', () => document.getElementById('file-import').click());
+    document.getElementById('file-import').addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                if (!applyState(JSON.parse(reader.result))) alert('Could not read that plan file.');
+            } catch (err) { alert('Not a valid JSON plan file.'); }
+        };
+        reader.readAsText(f);
+        e.target.value = '';
+    });
+
+    document.getElementById('preset-select').addEventListener('change', e => {
+        const p = allPresets().find(p => p.name === e.target.value);
+        if (p) {
+            document.getElementById('shelf-w').value = p.w;
+            document.getElementById('shelf-d').value = p.d;
+            document.getElementById('shelf-h').value = p.h;
+            recalcAll();
+        }
+        e.target.selectedIndex = 0;
+    });
+
+    document.getElementById('preset-save').addEventListener('click', () => {
+        const name = prompt('Preset name:', packMode === 'box' ? 'My box' : 'My shelf');
+        if (!name || !name.trim()) return;
+        const shelf = getShelf();
+        const user = getUserPresets().filter(p => p.name !== name.trim());
+        user.push({ name: name.trim(), w: shelf.w, d: shelf.d, h: shelf.h, type: packMode });
+        setUserPresets(user);
+        refreshPresetSelect();
+    });
+
+    document.getElementById('mode-shelf').addEventListener('click', () => applyMode('shelf'));
+    document.getElementById('mode-box').addEventListener('click', () => applyMode('box'));
+
+    document.getElementById('clm-out').addEventListener('click', exportCLM);
+    document.getElementById('clm-in').addEventListener('click', () => document.getElementById('clm-file').click());
+    document.getElementById('clm-file').addEventListener('change', e => {
+        if (e.target.files[0]) handleCLMFile(e.target.files[0]);
+        e.target.value = '';
+    });
+    CLM.offerBanner('stick-it-on-a-shelf', loadCLMManifest);
+
+    if (threeOK) {
+        init3D();
+    } else {
+        const vw = document.querySelector('.viewer-wrap');
+        if (vw) vw.innerHTML = '<p style="padding:24px;color:var(--ink-soft)">⚠ 3D view unavailable (three.js could not load). Planning and reports still work.</p>';
+    }
+    refreshPlanList();
+    applyMode('shelf');
+    const restored = CLM_CORE.store.getLS(LS_AUTOSAVE, null);
+    if (restored) applyState(restored); else recalcAll();
+}
+
+// TLA-safe boot: with top-level await this module may finish after
+// DOMContentLoaded has already fired, so boot directly when it has.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+    bootApp();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otter Fit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦦</text></svg>">
+<style>
+  :root { --bg:#0f172a; --panel:#111c33; --line:#253352; --text:#e2e8f0;
+          --muted:#94a3b8; --accent:#38bdf8; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); height:100vh; display:flex; flex-direction:column; }
+  header { padding:10px 16px; border-bottom:1px solid var(--line);
+           display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; font-weight:600; }
+  .tag { font-size:12px; color:var(--muted); font-style:italic; }
+  header .dims { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--muted); }
+  header input { width:72px; background:#0b1226; color:var(--text); border:1px solid var(--line);
+                 border-radius:6px; padding:4px 6px; font-size:13px; }
+  main { flex:1; display:flex; min-height:0; }
+  aside { width:500px; min-width:360px; border-right:1px solid var(--line);
+          display:flex; flex-direction:column; background:var(--panel); }
+  aside .pad { padding:12px; }
+  textarea { width:100%; height:110px; resize:vertical; background:#0b1226; color:var(--text);
+             border:1px solid var(--line); border-radius:8px; padding:8px;
+             font:12px/1.5 Consolas,monospace; }
+  .btnrow { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  button { background:#1e293b; border:1px solid var(--line); color:var(--text);
+           padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; }
+  button:hover { border-color:var(--accent); }
+  button.active, button.primary { background:var(--accent); border-color:var(--accent);
+           color:#082f49; font-weight:600; }
+  .suite-link { background:#1e293b; border:1px solid var(--line); color:var(--text);
+           padding:7px 12px; border-radius:8px; font-size:13px; text-decoration:none;
+           margin-left:auto; white-space:nowrap; }
+  .suite-link:hover { border-color:var(--accent); }
+  .lbl { font-size:12px; color:var(--muted); }
+  #flash { font-size:12px; color:#86efac; opacity:0; transition:opacity .4s; }
+  #summary { font-size:12px; color:var(--muted); margin-top:8px; }
+  #table-wrap { flex:1; overflow:auto; }
+  #table-wrap:focus { outline:2px solid #1e3a5f; outline-offset:-2px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { padding:6px 8px; text-align:left; border-top:1px solid var(--line); white-space:nowrap; }
+  th { position:sticky; top:0; background:var(--panel); color:var(--muted); font-weight:600; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:#16233f; }
+  tbody tr.sel { background:#12314f; }
+  .chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .chip.fit { background:#14532d; color:#86efac; }
+  .chip.rot { background:#57340a; color:#fcd34d; }
+  .chip.door{ background:#7c2d12; color:#fdba74; }
+  .chip.no  { background:#5f1616; color:#fca5a5; }
+  .chip.part{ background:#1e3a5f; color:#93c5fd; }
+  .chip.miss{ background:#334155; color:#cbd5e1; }
+  .mini { width:52px; background:#0b1226; color:var(--text); border:1px solid var(--line);
+          border-radius:5px; padding:2px 4px; font-size:12px; }
+  #viewport { flex:1; position:relative; min-width:0; }
+  canvas { display:block; }
+  #info { position:absolute; top:12px; left:12px; background:rgba(10,16,32,.85);
+          border:1px solid var(--line); border-radius:10px; padding:10px 14px;
+          font-size:13px; max-width:420px; backdrop-filter:blur(4px); }
+  #info b { color:var(--accent); }
+  #legend { position:absolute; bottom:12px; left:12px; background:rgba(10,16,32,.85);
+            border:1px solid var(--line); border-radius:10px; padding:8px 12px;
+            font-size:12px; color:var(--muted); max-width:75%; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦦 Otter Fit</h1>
+  <span class="tag">…because everything otter fit.</span>
+  <div class="dims">
+    <select id="vpreset" title="Vehicle presets come from clm-library.js" style="width:auto;background:#0b1226;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px;">
+      <option value="">— Vehicle preset —</option>
+    </select>
+    Car (mm): D <input id="ld" type="number" value="4400" step="10">
+    W <input id="lw" type="number" value="2100" step="10">
+    H <input id="lh" type="number" value="2500" step="10">
+    &nbsp; Door (mm): W <input id="dw" type="number" value="1800" step="10">
+    H <input id="dh" type="number" value="2400" step="10">
+  </div>
+  <a class="suite-link" href="suite.html" title="Back to the Collection Logistics Suite">Back to Hub</a>
+</header>
+<main>
+<aside>
+  <div class="pad">
+    <textarea id="data" placeholder="Paste items, one per line — straight from Excel is fine:&#10;Name, length, width, height&#10;1 number = length (shown as a line) · 2 numbers = length+width (floor outline)"></textarea>
+    <div class="btnrow">
+      <button class="primary" id="go">Visualise</button>
+      <button id="sample">Load sample</button>
+      <button id="viewOne" class="active">Selected item</button>
+      <button id="viewAll">All items</button>
+    </div>
+    <div class="btnrow">
+      <span class="lbl">Report:</span>
+      <button id="repAll" class="active">All</button>
+      <button id="repFit">Fit</button>
+      <button id="repNo">Don't fit</button>
+      <button id="pdf">📄 PDF</button>
+      <button id="csv"> CSV</button>
+      <button id="copy">⧉ Copy</button>
+      <span id="flash"></span>
+    </div>
+    <div class="btnrow">
+      <span class="lbl">Suite:</span>
+      <button id="clm-in">📥 Load Manifest</button>
+      <button id="clm-out">📤 Send to…</button>
+      <input id="clm-file" type="file" accept=".json,application/json" style="display:none;">
+      <label class="lbl" style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="By default, manifests check the crates/boxes that physically get moved. Tick this to also check the individual items listed inside them.">
+        <input type="checkbox" id="clm-inc-items" style="width:auto;"> also check source items
+      </label>
+    </div>
+    <div class="hint">Tip: after Visualise, use ↑ / ↓ to roll through items one at a time. Every full-dimension item is checked for stowage in the car AND passage through the door.</div>
+    <div id="summary"></div>
+  </div>
+  <div id="table-wrap" tabindex="0">
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th>L×W×H</th><th>Status</th><th>Rotation / placement</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</aside>
+<section id="viewport">
+  <div id="info">Paste your item list on the left — the 3D view updates automatically.<br>Drag to orbit, scroll to zoom, right-drag to pan.</div>
+  <div id="legend">Green outline = car · blue = door (to scale) · grey ghost = as-entered · rod = length only · flat outline = no height yet · red outline at door = cross-section too big · click a row to inspect</div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* ==== INLINED clm-core.js (standalone build — do not edit) ==== */
+/* ============================================================
+   CLM/1 — Collection Logistics Suite · SHARED CORE
+   ------------------------------------------------------------------
+   The shared engine extracted in Phase 2, extended in Phase 3:
+     CLM       — the clm/1 manifest adapter (make/parse/download/handoff)
+     CLM_CORE  — the engines all tools build on:
+                   dims     — parsing, orientation enumeration, formatting
+                   fit      — car stowage + door passage checks
+                   pack2d   — free-rect 2D packer (trays / flat areas)
+                   cratepack— padding → grouping → trays → crates pipeline
+                              (incl. tray inventory limits)
+                   export   — CSV/TSV/JSON download helpers
+                   store    — safe localStorage JSON helpers
+
+   Loaded via <script src="clm-core.js"> before each app's own script.
+   The per-app wrappers in the tools are one-liners onto these functions —
+   edit behaviour here and every tool follows.
+
+   Extracted from the apps (identical logic):
+     orientations/checkItem/parse/dimStr       — otter-fit.html
+     numOrNull/parseDimsCell/shelf2D/
+     mergeFreeRects/trayUtil                   — capackybara.html
+     parseTrayInventory/applyPadding/snapDepth/
+     process/groupKey/groupItems/packTrays/
+     consolidate/crateHeight/buildCrates/
+     validatePlacements                        — capackybara.html (tray inventory edition)
+     num                                       — stick-it-on-a-shelf.html
+   ============================================================ */
+
+const CLM = {
+    FORMAT: 'clm/1',
+    esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"]/g,
+            c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    },
+    make(project, sourceApp, items, containers, checks) {
+        return {
+            format: CLM.FORMAT,
+            project: project || 'Untitled project',
+            units: 'mm',
+            exported: new Date().toISOString(),
+            source: { app: sourceApp || 'unknown', version: '1' },
+            items: items || [],
+            containers: containers || [],
+            checks: checks || []
+        };
+    },
+    parse(text) {
+        const d = JSON.parse(text);
+        if (!d || d.format !== CLM.FORMAT || !Array.isArray(d.items)) {
+            throw new Error('not a clm/1 manifest');
+        }
+        d.containers = Array.isArray(d.containers) ? d.containers : [];
+        d.checks = Array.isArray(d.checks) ? d.checks : [];
+        return d;
+    },
+    download(m, filename) {
+        const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || 'collection-manifest.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    },
+    handoff(m) {
+        try { localStorage.setItem('clm-handoff', JSON.stringify({ t: Date.now(), m })); } catch (e) {}
+    },
+    readHandoff() {
+        try {
+            const h = JSON.parse(localStorage.getItem('clm-handoff') || 'null');
+            return h && h.m && h.m.format === CLM.FORMAT ? h.m : null;
+        } catch (e) { return null; }
+    },
+    clearHandoff() {
+        try { localStorage.removeItem('clm-handoff'); } catch (e) {}
+    },
+    offerBanner(myApp, onLoad) {
+        let m = null;
+        try { m = CLM.readHandoff(); } catch (e) {}
+        if (!m || (m.source && m.source.app === myApp)) return;
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:99999;background:#1f2937;' +
+            'color:#e5e7eb;border:1px solid #4b5563;border-radius:10px;padding:10px 14px;' +
+            'font:13px/1.45 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);' +
+            'display:flex;gap:10px;align-items:center;max-width:460px';
+        div.innerHTML = '<span>\uD83D\uDCE5 Manifest <b>\u201c' + CLM.esc(m.project) + '\u201d</b> from ' +
+            CLM.esc((m.source && m.source.app) || 'the suite') + ' \u2014 ' + m.items.length + ' item(s), ' +
+            m.containers.length + ' container(s)</span>';
+        const mk = (label, primary) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.style.cssText = 'cursor:pointer;border-radius:7px;padding:5px 11px;font:600 12px system-ui,sans-serif;' +
+                (primary ? 'background:#38bdf8;border:1px solid #38bdf8;color:#082f49'
+                         : 'background:transparent;border:1px solid #6b7280;color:#d1d5db');
+            return b;
+        };
+        const load = mk('Load', true), dismiss = mk('Dismiss', false);
+        load.onclick = () => { CLM.clearHandoff(); div.remove(); onLoad(m); };
+        dismiss.onclick = () => { CLM.clearHandoff(); div.remove(); };
+        div.appendChild(load);
+        div.appendChild(dismiss);
+        document.body.appendChild(div);
+    }
+};
+
+/* ================================================================
+   CLM_CORE — shared engines
+   ================================================================ */
+(function (root) {
+
+root.CLM = CLM;
+
+/* ---------- dims ---------- */
+function numOrNull(x) {
+        if (x === undefined || x === null) return null;
+        const n = parseFloat(String(x).trim());
+        return isFinite(n) && n > 0 ? n : null;
+    }
+
+function num(v, dflt) { const n = parseFloat(v); return isFinite(n) ? n : dflt; }
+
+function parseDimsCell(s) {
+        if (!s) return [null, null, null];
+
+        const parts = String(s)
+            .split(/[,;xX\u00d7]/)
+            .map(t => numOrNull(t));
+
+        return [parts[0] ?? null, parts[1] ?? null, parts[2] ?? null];
+    }
+
+function sortDesc(l, w, h) {
+    return [Number(l), Number(w), Number(h)].sort((a, b) => b - a);
+}
+
+function orientForPacking(item) {
+    return sortDesc(item.length_mm, item.width_mm, item.height_mm);
+}
+
+function orientations(l, w, h){
+  return [
+    { d:l, w:w, h:h, short:'none',
+      desc:'No rotation — load as entered.' },
+    { d:w, w:l, h:h, short:'turn 90° (upright)',
+      desc:'Keep upright and turn 90° clockwise (viewed from above).' },
+    { d:l, w:h, h:w, short:'roll onto side',
+      desc:'Roll 90° onto its right side; length still faces the door.' },
+    { d:h, w:l, h:w, short:'roll + turn 90°',
+      desc:'Roll 90° onto its right side, then turn 90° clockwise (viewed from above).' },
+    { d:w, w:h, h:l, short:'on end + turn 90°',
+      desc:'Stand it on its end (pitch 90° so length points up), then turn 90° clockwise (viewed from above).' },
+    { d:h, w:w, h:l, short:'stand on end',
+      desc:'Stand it on its end (pitch 90° about the width axis, length pointing up); original height faces the door.' },
+  ];
+}
+
+function parseItems(text){
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    line = line.trim(); if (!line) return;
+    if (/\t|;/.test(line)) line = line.replace(/(\d),(\d)/g, '$1$2');
+    let parts = line.split(/\t|,|;/).map(s => s.trim()).filter(s => s !== '');
+    if (parts.length < 1) parts = line.split(/\s+/);
+    const nums = []; let k = parts.length;
+    while (k > 0 && nums.length < 3){
+      const v = Number(parts[k-1]);
+      if (isFinite(v) && v > 0){ nums.unshift(v); k--; } else break;
+    }
+    const name = parts.slice(0, k).join(' ') || line.replace(/[,;\t]+$/,'');
+    if (nums.length === 0){ out.push({ name, error:true }); return; }
+    out.push({ name: name || 'Item ' + (out.length + 1),
+               l: nums[0] || 0, w: nums[1] || 0, h: nums[2] || 0 });
+  });
+  return out;
+}
+
+function dimStr(it) {
+    return [it.l, it.w, it.h].map(v => v > 0 ? v : '?').join(' x ');
+}
+
+/* ---------- fit (car stowage + door passage) ---------- */
+function checkItem(it, lift, door){
+  it.known = [it.l, it.w, it.h].filter(v => v > 0).length;
+  it.best = null; it.carBest = null; it.diagNote = ''; it.doorNote = '';
+  if (it.known === 3){
+    const effW = Math.min(door.w, lift.w), effH = Math.min(door.h, lift.h);
+    const opts = orientations(it.l, it.w, it.h).map(o => {
+      const carOK  = o.d <= lift.d && o.w <= lift.w && o.h <= lift.h;
+      const doorOK = o.w <= effW && o.h <= effH;
+      return { ...o, carOK, doorOK, ok: carOK && doorOK };
+    });
+    it.best   = opts.find(f => f.ok) || null;
+    it.carBest = opts.find(f => f.carOK) || null;
+    if (it.best){
+      it.status = it.best.short === 'none' ? 'fit' : 'rot';
+      it.margin = { d:lift.d - it.best.d, w:lift.w - it.best.w, h:lift.h - it.best.h };
+    } else if (it.carBest){
+      it.status = 'door';
+      const req = opts.filter(o => o.carOK).slice().sort((a,b) => a.w*a.h - b.w*b.h)[0];
+      it.doorNote = 'Fits inside the car (' + it.carBest.short + ') but its smallest presentable cross-section, ' +
+        req.w + ' × ' + req.h + ' mm, is larger than the ' + door.w + ' × ' + door.h + ' mm door.';
+    } else {
+      it.status = 'no';
+      const dims = [it.l, it.w, it.h].sort((a,b) => b - a);
+      const tiltLen = Math.sqrt(lift.d*lift.d + lift.h*lift.h);
+      const tiltX   = Math.hypot(lift.w, lift.h);
+      it.diagNote = (dims[0] <= tiltLen && dims[1] <= tiltX && dims[2] <= Math.min(lift.w, lift.h))
+        ? 'Longest side (' + dims[0] + ' mm) is shorter than the car\'s diagonal — an angled/tilted load might work, check manually.'
+        : '';
+    }
+  } else if (it.known === 1){
+    it.status = 'part';
+    const L = it.l;
+    const floorDiag = Math.hypot(lift.d, lift.w);
+    const bodyDiag  = Math.sqrt(lift.d**2 + lift.w**2 + lift.h**2);
+    if (L <= lift.d) it.lineFit = { type:'depth', short:'line along depth',
+      desc:'length fits lying along the depth', place:'line lies along the car depth, on the floor' };
+    else if (L <= floorDiag) it.lineFit = { type:'floorDiag', short:'line on floor diagonal',
+      desc:'length fits only lying diagonally on the floor', place:'line lies diagonally across the floor' };
+    else if (L <= bodyDiag) it.lineFit = { type:'bodyDiag', short:'line on body diagonal',
+      desc:'length fits only tilted corner-to-corner in 3D', place:'line tilted on the body diagonal' };
+    else it.lineFit = { type:'none', short:'too long',
+      desc:'length too long for the car in any direction', place:'shown sticking out along the depth' };
+  } else if (it.known === 2){
+    it.status = 'part';
+    if (it.l <= lift.d && it.w <= lift.w)
+      it.rectFit = { fits:true, rot:false, short:'as entered', desc:'footprint fits as entered (height unknown)' };
+    else if (it.w <= lift.d && it.l <= lift.w)
+      it.rectFit = { fits:true, rot:true, short:'turn 90°', desc:'footprint fits turned 90° (height unknown)' };
+    else
+      it.rectFit = { fits:false, rot:false, short:'no flat fit', desc:'footprint does not fit flat — may fit diagonally, check manually' };
+  } else {
+    it.status = 'no';
+  }
+}
+
+/* ---------- pack2d (free-rect packer) ---------- */
+function shelf2D(items, cL, cW) {
+        if (!items.length || cL <= 0 || cW <= 0) {
+            return { placed: [], notPlaced: [...items] };
+        }
+
+        const sorted = [...items].sort((a, b) => {
+            const am = Math.max(a.pL, a.pW);
+            const bm = Math.max(b.pL, b.pW);
+            return bm - am || (b.pL * b.pW) - (a.pL * a.pW);
+        });
+
+        const placed = [];
+        const notPlaced = [];
+        let freeRects = [{ x: 0, z: 0, w: cL, d: cW }];
+
+        for (const item of sorted) {
+            let bestFit = null;
+            let bestFitIndex = -1;
+            let bestRotation = false;
+
+            for (const [tl, tw, rot] of [[item.pL, item.pW, false], [item.pW, item.pL, true]]) {
+                for (let fi = 0; fi < freeRects.length; fi++) {
+                    const fr = freeRects[fi];
+
+                    if (tl <= fr.w && tw <= fr.d) {
+                        const waste = (fr.w * fr.d) - (tl * tw);
+
+                        if (bestFit === null || waste < bestFit.waste) {
+                            bestFit = {
+                                x: fr.x,
+                                z: fr.z,
+                                l: tl,
+                                w: tw,
+                                waste,
+                                fi
+                            };
+                            bestFitIndex = fi;
+                            bestRotation = rot;
+                        }
+                    }
+                }
+            }
+
+            if (bestFit) {
+                placed.push({
+                    ...item,
+                    px: bestFit.x,
+                    pz: bestFit.z,
+                    pl: bestFit.l,
+                    pw: bestFit.w,
+                    rot: bestRotation
+                });
+
+                const used = freeRects.splice(bestFitIndex, 1)[0];
+                const newFree = [];
+
+                if (used.w - bestFit.l > 10) {
+                    newFree.push({
+                        x: used.x + bestFit.l,
+                        z: used.z,
+                        w: used.w - bestFit.l,
+                        d: used.d
+                    });
+                }
+
+                if (used.d - bestFit.w > 10) {
+                    newFree.push({
+                        x: used.x,
+                        z: used.z + bestFit.w,
+                        w: bestFit.l,
+                        d: used.d - bestFit.w
+                    });
+                }
+
+                freeRects = [...freeRects, ...newFree];
+                freeRects = mergeFreeRects(freeRects);
+            } else {
+                notPlaced.push(item);
+            }
+        }
+
+        return { placed, notPlaced };
+    }
+
+function mergeFreeRects(rects) {
+        const merged = [];
+
+        for (let i = 0; i < rects.length; i++) {
+            let contained = false;
+
+            for (let j = 0; j < rects.length; j++) {
+                if (i === j) continue;
+
+                const a = rects[i];
+                const b = rects[j];
+
+                if (
+                    a.x >= b.x &&
+                    a.z >= b.z &&
+                    a.x + a.w <= b.x + b.w &&
+                    a.z + a.d <= b.z + b.d
+                ) {
+                    contained = true;
+                    break;
+                }
+            }
+
+            if (!contained) merged.push(rects[i]);
+        }
+
+        return merged;
+    }
+
+function trayUtil(items, tL, tW, tD) {
+        if (!items || !items.length || tL <= 0 || tW <= 0 || tD <= 0) return 0;
+
+        return items.reduce((s, i) => {
+            return s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0);
+        }, 0) / (tL * tW * tD);
+    }
+
+/* ---------- cratepack: padding → grouping → trays → crates ---------- */
+function parseTrayInventory(inputStr) {
+    const inventory = {};
+    const parts = inputStr.split(',').map(s => s.trim()).filter(s => s);
+    let hasLimits = false;
+
+    parts.forEach(part => {
+        if (part.includes(':')) {
+            const [d, c] = part.split(':').map(s => parseInt(s.trim()));
+            if (!isNaN(d) && !isNaN(c)) {
+                inventory[d] = c;
+                hasLimits = true;
+            }
+        } else {
+            const d = parseInt(part);
+            if (!isNaN(d)) {
+                inventory[d] = Infinity; // Infinite supply if no count is given
+            }
+        }
+    });
+
+    return { inventory, hasLimits };
+}
+
+function applyPadding(item, cfg) {
+        const [baseLength, baseWidth, uprightHeight] = orientForPacking(item);
+        let pl, pw, ph;
+
+        if (cfg.padStrategy === 'proportional') {
+            const pL = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseLength * cfg.padFactor / 100));
+            const pW = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseWidth * cfg.padFactor / 100));
+
+            pl = baseLength + 2 * pL;
+            pw = baseWidth + 2 * pW;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        } else {
+            pl = baseLength + 2 * cfg.flatPad;
+            pw = baseWidth + 2 * cfg.flatPad;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        }
+
+        return {
+            ...item,
+            pL: Math.ceil(pl),
+            pW: Math.ceil(pw),
+            pH: Math.ceil(ph),
+            bL: baseLength,
+            bW: baseWidth
+        };
+    }
+
+function snapDepth(h, depths) {
+        for (const d of depths) {
+            if (h <= d) return { depth: d, custom: false };
+        }
+        return { depth: Math.ceil(h / 50) * 50, custom: true };
+    }
+
+function process(raw, cfg) {
+        return raw.map(item => {
+            const it = { ...item };
+
+            if (!it.length_mm || it.length_mm <= 0) {
+                it.length_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.width_mm || it.width_mm <= 0) {
+                it.width_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.height_mm || it.height_mm <= 0) {
+                it.height_mm = cfg.heightDefaults[it.type] || cfg.fallbackHeight || 50;
+            }
+
+            const p = applyPadding(it, cfg);
+            const s = snapDepth(p.pH, cfg.trayDepths);
+
+            return {
+                ...p,
+                snapDepth: s.depth,
+                isCustom: s.custom
+            };
+        });
+    }
+
+function groupKey(item, strategy) {
+        return strategy === 'type-depth'
+            ? `${item.type}__${item.snapDepth}`
+            : `d__${item.snapDepth}`;
+    }
+
+function groupItems(items, strategy) {
+        const g = {};
+
+        for (const it of items) {
+            const k = groupKey(it, strategy);
+            if (!g[k]) {
+                g[k] = {
+                    key: k,
+                    type: it.type,
+                    depth: it.snapDepth,
+                    items: []
+                };
+            }
+            g[k].items.push(it);
+        }
+
+        return Object.values(g);
+    }
+
+function packTrays(groups, cfg, trayInventory) {
+    const trays = [];
+    const unpacked = [];
+    let tid = 0;
+
+    for (const grp of groups) {
+        grp.items.sort((a, b) => (b.pL * b.pW) - (a.pL * a.pW));
+        let rem = [...grp.items];
+
+        // Get all depths >= group's required depth, sorted ascending
+        const validDepths = cfg.trayDepths.filter(d => d >= grp.depth);
+
+        for (const fp of cfg.footprints) {
+            while (rem.length > 0) {
+                // 1. Try to pack into the current footprint
+                const res = shelf2D(rem, fp.l, fp.w);
+
+                if (res.placed.length === 0) {
+                    // Items are too large for this footprint entirely.
+                    break;
+                }
+
+                // 2. Find the smallest available depth that fits the group's requirement
+                let assignedDepth = null;
+                for (const d of validDepths) {
+                    if (trayInventory[d] > 0) {
+                        assignedDepth = d;
+                        break;
+                    }
+                }
+
+                if (!assignedDepth) {
+                    // We ran out of all valid trays. 
+                    rem.forEach(item => item.unpackedReason = 'no_trays');
+                    unpacked.push(...rem);
+                    rem = [];
+                    break;
+                }
+
+                // We have a tray! Consume it from the physical inventory.
+                trayInventory[assignedDepth]--;
+
+                tid++;
+                trays.push({
+                    id: tid,
+                    fp: { l: fp.l, w: fp.w },
+                    depth: assignedDepth, // Note: This might be larger than grp.depth if we spilled over
+                    type: grp.type,
+                    items: res.placed,
+                    util: trayUtil(res.placed, fp.l, fp.w, assignedDepth)
+                });
+
+                rem = res.notPlaced;
+            }
+
+            if (rem.length === 0) break;
+        }
+
+        // If there are still items left after checking all footprints, they are physically oversized
+        if (rem.length > 0) {
+            rem.forEach(item => item.unpackedReason = 'oversized');
+            unpacked.push(...rem);
+        }
+    }
+
+    return { trays, unpacked };
+}
+
+function consolidate(trays, cfg) {
+        if (trays.length <= 1) return trays;
+
+        const res = [...trays];
+        let changed = true;
+        let iter = 0;
+
+        while (changed && iter < 100) {
+            changed = false;
+            iter++;
+
+            for (let i = 0; i < res.length && !changed; i++) {
+                if (res[i].util * 100 >= cfg.minUtil) continue;
+
+                for (let j = i + 1; j < res.length && !changed; j++) {
+                    if (res[i].fp.l !== res[j].fp.l || res[i].fp.w !== res[j].fp.w) continue;
+                    if (Math.abs(res[i].depth - res[j].depth) > cfg.maxDepthVar) continue;
+                    if (!cfg.crossType && res[i].type !== res[j].type) continue;
+
+                    const all = [...res[i].items, ...res[j].items].map(it => ({
+                        ...it,
+                        px: undefined,
+                        pz: undefined,
+                        pl: undefined,
+                        pw: undefined,
+                        rot: undefined
+                    }));
+
+                    const r2 = shelf2D(all, res[i].fp.l, res[i].fp.w);
+
+                    if (!r2.notPlaced.length) {
+                        res[i].items = r2.placed;
+                        res[i].depth = Math.max(res[i].depth, res[j].depth);
+                        res[i].util = trayUtil(r2.placed, res[i].fp.l, res[i].fp.w, res[i].depth);
+
+                        if (cfg.crossType) {
+                            res[i].type = res[i].type + '/' + res[j].type;
+                        }
+
+                        res.splice(j, 1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        res.forEach((t, i) => t.id = i + 1);
+        return res;
+    }
+
+function crateHeight(trays, allow) {
+        let h = allow.base + allow.top;
+
+        trays.forEach((t, i) => {
+            if (i > 0) h += allow.interlayer;
+            h += t.extD; // Use external depth (internal + base + lid)
+        });
+
+        return h;
+    }
+
+function buildCrates(trays, allow, maxCrate, trayStruct) {
+        if (!trays.length) return [];
+
+        const groups = {};
+
+        for (const t of trays) {
+            // Calculate EXTERNAL tray dimensions
+            const extTrayL = t.fp.l + (2 * trayStruct.sideWall);
+            const extTrayW = t.fp.w + (2 * trayStruct.sideWall);
+            const extTrayD = t.depth + trayStruct.base + trayStruct.lid;
+
+            const k = extTrayL + 'x' + extTrayW;
+
+            if (!groups[k]) {
+                groups[k] = {
+                    extFp: { l: extTrayL, w: extTrayW },
+                    extDepth: extTrayD,
+                    trays: []
+                };
+            }
+
+            groups[k].trays.push({
+                ...t,
+                extL: extTrayL,
+                extW: extTrayW,
+                extD: extTrayD
+            });
+        }
+
+        // Heavier trays toward the bottom of each crate
+        for (const g of Object.values(groups)) {
+            g.trays.sort((a, b) => {
+                const massA = a.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+                const massB = b.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+
+                if (massB !== massA) return massB - massA;
+                return b.extD - a.extD;
+            });
+        }
+
+        const crates = [];
+        let cid = 0;
+
+        for (const g of Object.values(groups)) {
+            let chunk = [];
+
+            for (const tray of g.trays) {
+                const test = [...chunk, tray];
+                const testH = crateHeight(test, allow);
+
+                if (maxCrate.h > 0 && testH > maxCrate.h && chunk.length > 0) {
+                    cid++;
+                    const h = crateHeight(chunk, allow);
+                    const l = g.extFp.l + (2 * allow.sides);
+                    const w = g.extFp.w + (2 * allow.sides);
+
+                    crates.push({
+                        id: cid,
+                        ext: { l, w, h },
+                        trays: chunk,
+                        yBase: allow.base,
+                        overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                    });
+
+                    chunk = [tray];
+                } else {
+                    chunk.push(tray);
+                }
+            }
+
+            if (chunk.length > 0) {
+                cid++;
+                const h = crateHeight(chunk, allow);
+                const l = g.extFp.l + (2 * allow.sides);
+                const w = g.extFp.w + (2 * allow.sides);
+
+                crates.push({
+                    id: cid,
+                    ext: { l, w, h },
+                    trays: chunk,
+                    yBase: allow.base,
+                    overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                });
+            }
+        }
+
+        return crates;
+    }
+
+function validatePlacements(trays) {
+        let v = 0;
+
+        for (const tray of trays) {
+            for (const it of tray.items) {
+                if (it.px + it.pl > tray.fp.l + 0.01 || it.pz + it.pw > tray.fp.w + 0.01) {
+                    v++;
+                }
+            }
+        }
+
+        return v;
+    }
+
+function makeOversizedCrates(items, cfg) {
+    if (!cfg.createOvrCrates || !items.length) return { crates: [], unpacked: [...items] };
+
+    const crates = [];
+    let ovrIdx = 1;
+
+    for (const item of items) {
+        const extTrayL = item.pL + (2 * cfg.trayStruct.sideWall);
+        const extTrayW = item.pW + (2 * cfg.trayStruct.sideWall);
+        const extTrayD = item.pH + cfg.trayStruct.base + cfg.trayStruct.lid;
+
+        const l = extTrayL + (2 * cfg.allow.sides);
+        const w = extTrayW + (2 * cfg.allow.sides);
+        const h = extTrayD + cfg.allow.base + cfg.allow.top;
+
+        const synTray = {
+            id: 'OVR-T' + ovrIdx,
+            fp: { l: item.pL, w: item.pW },
+            depth: item.pH,
+            extL: extTrayL,
+            extW: extTrayW,
+            extD: extTrayD,
+            type: item.type,
+            items: [{
+                ...item,
+                px: 0,
+                pz: 0,
+                pl: item.pL,
+                pw: item.pW,
+                rot: false
+            }],
+            util: 1.0
+        };
+
+        crates.push({
+            id: 'OVR-' + ovrIdx,
+            ext: { l, w, h },
+            trays: [synTray],
+            yBase: cfg.allow.base,
+            overMax:
+                (cfg.maxCrate.h > 0 && h > cfg.maxCrate.h) ||
+                (cfg.maxCrate.l > 0 && l > cfg.maxCrate.l) ||
+                (cfg.maxCrate.w > 0 && w > cfg.maxCrate.w),
+            isOversized: true
+        });
+
+        ovrIdx++;
+    }
+
+    return { crates, unpacked: [] };
+}
+
+/* ---------- export ---------- */
+function csvEsc(v) {
+    v = String(v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+
+function toCSV(rows) {
+    return '\uFEFF' + rows.map(r => r.map(csvEsc).join(',')).join('\r\n');
+}
+
+function toTSV(rows) {
+    return rows.map(r => r.join('\t')).join('\r\n');
+}
+
+function downloadText(filename, text, mime) {
+    const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function downloadJSON(filename, obj) {
+    downloadText(filename, JSON.stringify(obj, null, 2), 'application/json');
+}
+
+/* ---------- store (safe localStorage JSON) ---------- */
+function getLS(key, dflt) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? dflt; } catch (e) { return dflt; }
+}
+
+function setLS(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+function removeLS(key) {
+    try { localStorage.removeItem(key); } catch (e) {}
+}
+
+root.CLM_CORE = {
+    dims: {
+        numOrNull, num, parseDimsCell, sortDesc,
+        orientations, parseItems, dimStr
+    },
+    fit: { checkItem },
+    pack2d: { shelf2D, mergeFreeRects, trayUtil },
+    cratepack: {
+        parseTrayInventory, applyPadding, snapDepth, process,
+        groupKey, groupItems, packTrays, consolidate,
+        crateHeight, buildCrates, validatePlacements, makeOversizedCrates
+    },
+    export: { csvEsc, toCSV, toTSV, downloadText, downloadJSON },
+    store: { getLS, setLS, removeLS }
+};
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* ==== INLINED clm-library.js (standalone build — do not edit) ==== */
+/* ============================================================
+   CLM/1 — Collection Logistics Suite · SHARED LIBRARY
+   ------------------------------------------------------------------
+   Single source of truth for the standard data all three tools use:
+   standard boxes, store/bay presets, tray footprints, typical crate
+   sizes, object-type height defaults, vehicle presets.
+
+   Loaded via <script src="clm-library.js"> by every suite app.
+   If this file is missing, each app falls back to its built-in copy,
+   so the tools still work standalone — but edit THIS file to keep the
+   suite in sync.
+
+   Dimensions are millimetres. Preset shape convention:
+     shelf/box/crate preset: { name, l, d, h }   (l = width along the wall,
+                                                   d = depth front-to-back,
+                                                   h = clear/outer height)
+     tray footprint:         { label, l, w }     (internal footprint)
+     vehicle:                { name, d, w, h, doorW, doorH }
+   ============================================================ */
+
+window.CLM_LIBRARY = {
+
+  version: '1',
+
+  /* ---- standard collection boxes (height is external) ---- */
+  standardBoxes: [
+    { name: 'Box C',  l: 430, w: 280, h: 95  },
+    { name: 'Box D',  l: 435, w: 285, h: 190 },
+    { name: 'Box E',  l: 585, w: 435, h: 95  },
+    { name: 'Box F',  l: 585, w: 435, h: 190 },
+    { name: 'Box A1', l: 682, w: 427, h: 285 },
+    { name: 'Box A',  l: 685, w: 427, h: 145 },
+    { name: 'Box B',  l: 877, w: 432, h: 145 },
+    { name: 'Box B1', l: 877, w: 432, h: 285 },
+    { name: 'Box G',  l: 430, w: 280, h: 305 },
+    { name: 'Box H',  l: 215, w: 280, h: 305 }
+  ],
+
+  /* ---- store / bay presets (shelf clearances) ---- */
+  shelfPresets: [
+    { name: 'Hurunui (Panel)',        l: 900,  d: 450, h: 320  },
+    { name: 'Waimakariri (Longspan)', l: 1800, d: 500, h: 340  },
+    { name: 'Textiles 1 (Longspan)',  l: 1800, d: 900, h: 300  },
+    { name: 'Textiles 2 (Longspan)',  l: 1800, d: 700, h: 300  },
+    { name: 'Otakaro (Panel)',        l: 900,  d: 300, h: 320  },
+    { name: 'Geology (Longspan)',     l: 1060, d: 750, h: 500  },
+    { name: 'Vertebrate (Longspan)',  l: 2190, d: 750, h: 375  },
+    { name: 'Wet store (Panel)',      l: 900,  d: 250, h: 150  },
+    { name: 'Pallet Racking short',   l: 2700, d: 900, h: 900  },
+    { name: 'Pallet Racking tall',    l: 2700, d: 900, h: 1500 },
+    { name: 'Pallet tub',             l: 920,  d:1115, h:620   }
+  ],
+
+  /* ---- box presets (same units, offered as placeable containers) ---- */
+  boxPresets: [
+    { name: 'Box C',  l: 430, d: 280, h: 95  },
+    { name: 'Box D',  l: 435, d: 285, h: 190 },
+    { name: 'Box E',  l: 585, d: 435, h: 95  },
+    { name: 'Box F',  l: 585, d: 435, h: 190 },
+    { name: 'Box A1', l: 682, d: 427, h: 285 },
+    { name: 'Box A',  l: 685, d: 427, h: 145 },
+    { name: 'Box B',  l: 877, d: 432, h: 145 },
+    { name: 'Box B1', l: 877, d: 432, h: 285 },
+    { name: 'Box G',  l: 430, d: 280, h: 305 },
+    { name: 'Box H',  l: 215, d: 280, h: 305 }
+  ],
+
+  /* ---- typical CaPackyBara crate output (external dims) ----
+     Derived with the app's default allowances:
+       tray: footprint 895×790 internal + 18 mm side wall + 18 mm base + 0 lid
+       crate: + 30 mm sides, 150 mm base board, 18 mm top, 12 mm interlayer
+     Treat as starting points — regenerate exact dims from CaPackyBara. */
+  cratePresets: [
+    { name: 'ClipCrate tray 100 (ext)',   l: 931, d: 826, h: 118 },
+    { name: 'ClipCrate tray 200 (ext)',   l: 931, d: 826, h: 218 },
+    { name: 'ClipCrate 1×200 (ext)',      l: 991, d: 886, h: 386 },
+    { name: 'ClipCrate 2×200 (ext)',      l: 991, d: 886, h: 616 },
+    { name: 'ClipCrate 3×200 (ext)',      l: 991, d: 886, h: 846 }
+  ],
+
+  /* ---- tray internal footprints offered by CaPackyBara ---- */
+  trayFootprints: [
+    { label: 'ClipCrate',        l: 895, w: 790 },
+    { label: 'Half ClipCrate',   l: 440, w: 790 },
+    { label: 'Quarter ClipCrate', l: 440, w: 395 }
+  ],
+
+  /* ---- assumed object heights by nomenclature type (mm) ---- */
+  typeHeights: {
+    'pendant': 15,
+    'hei tiki': 20,
+    'hei-tiki': 20,
+    'heitiki': 20,
+    'tool': 50,
+    'adze': 50,
+    'chisel': 50,
+    'mere': 60,
+    'boulder': 150,
+    'modern': 45,
+    'raw': 100
+  },
+
+  /* ---- vehicle / lift presets for Otter Fit ----
+     Editable starting points, not measurements of specific vehicles. */
+  vehicles: [
+    { name: 'Lift car (large)', d: 4400, w: 2100, h: 2500, doorW: 1800, doorH: 2400 },
+    { name: 'Lift car (small)', d: 2500, w: 1600, h: 2200, doorW: 1100, doorH: 2100 },
+    { name: 'Cage van',         d: 4200, w: 1800, h: 1900, doorW: 1300, doorH: 1800 }
+    
+  ]
+};
+
+</script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+
+
+<script type="module">
+// ---------------- shared three.js: one build for the whole suite ----------------
+let THREE = null, OrbitControls = null;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+} catch (e) { THREE = null; OrbitControls = null; }
+const threeOK = !!THREE && !!OrbitControls;
+
+// ---------------- state ----------------
+const lift = { d:4400, w:2100, h:2500 };
+const door = { w:1800, h:2400 };
+let items = [], selected = -1, mode = 'one', reportScope = 'all';
+let liftGroup = null, itemMeshes = [];
+
+// ---------------- three.js setup ----------------
+let scene, camera, renderer, controls;
+const viewport = document.getElementById('viewport');
+
+if (threeOK){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f172a);
+  camera = new THREE.PerspectiveCamera(45, 1, 10, 80000);
+  camera.position.set(5200, 4200, 6400);
+  renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+  viewport.appendChild(renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1000, 0);
+  controls.enableDamping = true;
+  scene.add(new THREE.AmbientLight(0xffffff, .55));
+  const dl0 = new THREE.DirectionalLight(0xffffff, .75);
+  dl0.position.set(6000, 9000, 5000);
+  scene.add(dl0);
+  scene.add(new THREE.GridHelper(12000, 24, 0x334155, 0x1e293b));
+  window.addEventListener('resize', resize);
+} else {
+  document.getElementById('info').innerHTML =
+    '⚠ 3D library could not load (internet needed once for the CDN).<br>Table, CSV and text-only PDF still work.';
+}
+function resize(){
+  if (!threeOK) return;
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+function label(text, color, size){
+  color = color || '#e2e8f0'; size = size || 560;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.font = 'bold 64px Segoe UI, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = color; g.fillText(text, 256, 64);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), depthTest:false }));
+  s.scale.set(size, size/4, 1);
+  return s;
+}
+function buildLift(){
+  if (!threeOK) return;
+  if (liftGroup){
+    scene.remove(liftGroup);
+    liftGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  liftGroup = new THREE.Group();
+  const box = new THREE.BoxGeometry(lift.w, lift.h, lift.d);
+  const shell = new THREE.Mesh(box, new THREE.MeshLambertMaterial({
+    color:0x38bdf8, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false }));
+  shell.position.y = lift.h/2; liftGroup.add(shell);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box),
+    new THREE.LineBasicMaterial({ color:0x22c55e }));
+  edges.position.y = lift.h/2; liftGroup.add(edges);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(lift.w, lift.d),
+    new THREE.MeshLambertMaterial({ color:0x14532d, transparent:true, opacity:.35, side:THREE.DoubleSide }));
+  floor.rotation.x = -Math.PI/2; floor.position.y = 2; liftGroup.add(floor);
+
+  const dw = Math.min(door.w, lift.w), dh = Math.min(door.h, lift.h);
+  const doorMesh = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
+    new THREE.MeshBasicMaterial({ color:0x38bdf8, transparent:true, opacity:.12, side:THREE.DoubleSide }));
+  doorMesh.position.set(0, dh/2, lift.d/2 - 1);
+  liftGroup.add(doorMesh);
+  const dpts = [ new THREE.Vector3(-dw/2,0,lift.d/2-1), new THREE.Vector3(dw/2,0,lift.d/2-1),
+                 new THREE.Vector3(dw/2,dh,lift.d/2-1), new THREE.Vector3(-dw/2,dh,lift.d/2-1) ];
+  liftGroup.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(dpts),
+    new THREE.LineBasicMaterial({ color:0x38bdf8 })));
+  const dlb = label('DOOR ' + door.w + ' × ' + door.h, '#7dd3fc', 520);
+  dlb.position.set(0, lift.h + 260, lift.d/2);
+  liftGroup.add(dlb);
+
+  const lw = label(lift.w + ' mm wide', '#94a3b8'); lw.position.set(0, -280, lift.d/2 + 260);
+  const ld = label(lift.d + ' mm deep', '#94a3b8'); ld.position.set(lift.w/2 + 460, -280, 0);
+  const lh = label(lift.h + ' mm high', '#94a3b8'); lh.position.set(-lift.w/2 - 460, lift.h/2, lift.d/2);
+  liftGroup.add(lw, ld, lh);
+  scene.add(liftGroup);
+  controls.target.set(0, lift.h*0.4, 0);
+}
+
+// ---------------- fit logic: car stowage AND door passage ----------------
+function orientations(l, w, h) {
+  return CLM_CORE.dims.orientations(l, w, h);
+}
+function checkItem(it) {
+  CLM_CORE.fit.checkItem(it, lift, door);
+}
+// ---------------- report scoping ----------------
+function isFit(it){ return !it.error && it.known === 3 && !!it.best; }
+function isNoFit(it){
+  if (it.error) return false;
+  if (it.known === 3) return !it.best;
+  if (it.known === 1) return it.lineFit.type === 'none';
+  if (it.known === 2) return !it.rectFit.fits;
+  return false;
+}
+function scopeItems(){
+  const arr = items.map((it, i) => ({ it, idx: i + 1 }));
+  if (reportScope === 'fit') return arr.filter(x => isFit(x.it));
+  if (reportScope === 'no')  return arr.filter(x => isNoFit(x.it));
+  return arr;
+}
+const scopeLabel = () => reportScope === 'all' ? 'All items'
+  : reportScope === 'fit' ? 'Items that fit'
+  : "Items that don't fit (confirmed)";
+
+// ---------------- drawing ----------------
+const palette = [0x38bdf8,0xa78bfa,0xf472b6,0xfbbf24,0x34d399,0xfb7185,0x60a5fa,0xfacc15,0x4ade80,0xc084fc];
+function clearItems(){
+  if (!threeOK) return;
+  itemMeshes.forEach(m => {
+    m.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); });
+    scene.remove(m);
+  });
+  itemMeshes = [];
+}
+function boxMesh(o, color, cx, cz, opacity){
+  if (!threeOK) return;
+  opacity = opacity === undefined ? 0.85 : opacity;
+  const g = new THREE.BoxGeometry(o.w, o.h, o.d);
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, transparent:true, opacity }));
+  m.position.set(cx, o.h/2, cz);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
+    new THREE.LineBasicMaterial({ color:0x0f172a })));
+  scene.add(m); itemMeshes.push(m);
+}
+function ghostMesh(o){
+  if (!threeOK) return;
+  const g = new THREE.BoxGeometry(o.w, o.h, o.d);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color:0x94a3b8, transparent:true, opacity:.10, depthWrite:false }));
+  m.position.set(0, o.h/2, 0);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
+    new THREE.LineBasicMaterial({ color:0x94a3b8 })));
+  scene.add(m); itemMeshes.push(m);
+}
+function crossOutline(w, h, color){
+  if (!threeOK) return;
+  const pts = [ new THREE.Vector3(-w/2,0,0), new THREE.Vector3(w/2,0,0),
+                new THREE.Vector3(w/2,h,0), new THREE.Vector3(-w/2,h,0) ];
+  const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color }));
+  loop.position.set(0, 0, lift.d/2 - 3);
+  scene.add(loop); itemMeshes.push(loop);
+}
+function lineMesh(len, dir, center, color){
+  if (!threeOK) return;
+  const d = dir.clone().normalize();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(25, 25, len, 12),
+    new THREE.MeshLambertMaterial({ color, transparent:true, opacity:.95 }));
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d);
+  m.position.copy(center);
+  scene.add(m); itemMeshes.push(m);
+  const sg = new THREE.SphereGeometry(60, 12, 12);
+  [-1,1].forEach(s => {
+    const sp = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color }));
+    sp.position.copy(center).add(d.clone().multiplyScalar(s*len/2));
+    scene.add(sp); itemMeshes.push(sp);
+  });
+}
+function rectOutline(L, W, color, cx, cz){
+  if (!threeOK) return;
+  cx = cx || 0; cz = cz || 0;
+  const pts = [ new THREE.Vector3(-W/2,5,-L/2), new THREE.Vector3(W/2,5,-L/2),
+                new THREE.Vector3(W/2,5,L/2), new THREE.Vector3(-W/2,5,L/2) ];
+  const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color }));
+  loop.position.set(cx, 0, cz);
+  scene.add(loop); itemMeshes.push(loop);
+}
+const esc = CLM.esc;
+const vol = o => o.d * o.w * o.h;
+const dimStr = CLM_CORE.dims.dimStr;
+function nameId(it){
+  const m = String(it.name).match(/\(([^)]*)\)\s*$/);
+  if (m) return { name: it.name.slice(0, m.index).trim() || it.name, id: m[1] };
+  return { name: it.name, id: '' };
+}
+function resultLines(it){
+  if (it.error) return ['NO DATA'];
+  if (it.known === 1) return ['LENGTH ONLY', it.lineFit.short];
+  if (it.known === 2) return ['NO HEIGHT', it.rectFit.short];
+  if (it.status === 'fit') return ['FITS', 'no rotation'];
+  if (it.status === 'rot') return ['FITS (ROTATED)', it.best.short];
+  if (it.status === 'door') return ['CAR YES / DOOR NO', it.carBest.short + ' - door blocks'];
+  return ['NO FIT'];
+}
+
+function buildItemScene(it){
+  if (it.known === 3){
+    if (it.status === 'no'){ boxMesh(orientations(it.l,it.w,it.h)[0], 0xef4444, 0, 0, .7); return; }
+    if (it.status === 'door'){
+      boxMesh(it.carBest, 0xfb923c, 0, 0, .8);
+      crossOutline(it.carBest.w, it.carBest.h, 0xef4444);
+      return;
+    }
+    if (it.status === 'rot') ghostMesh(orientations(it.l, it.w, it.h)[0]);
+    boxMesh(it.best, it.status === 'fit' ? 0x22c55e : 0xf59e0b, 0, 0);
+  } else if (it.known === 1){
+    const col = { depth:0x22c55e, floorDiag:0xf59e0b, bodyDiag:0xfb923c, none:0xef4444 }[it.lineFit.type];
+    let dirV, center;
+    if (it.lineFit.type === 'depth'){ dirV = new THREE.Vector3(0,0,1); center = new THREE.Vector3(0,60,0); }
+    else if (it.lineFit.type === 'floorDiag'){ dirV = new THREE.Vector3(lift.w,0,lift.d); center = new THREE.Vector3(0,60,0); }
+    else if (it.lineFit.type === 'bodyDiag'){ dirV = new THREE.Vector3(lift.w,lift.h,lift.d); center = new THREE.Vector3(0,lift.h/2,0); }
+    else { dirV = new THREE.Vector3(0,0,1); center = new THREE.Vector3(0,60,0); }
+    lineMesh(it.l, dirV, center, col);
+    const lb = label(it.l + ' mm', '#e2e8f0', 480);
+    lb.position.copy(center).add(new THREE.Vector3(0, 320, 0));
+    scene.add(lb); itemMeshes.push(lb);
+  } else if (it.known === 2){
+    const r = it.rectFit;
+    rectOutline(r.rot ? it.w : it.l, r.rot ? it.l : it.w, r.fits ? 0x22c55e : 0xef4444);
+  }
+}
+function showOne(){
+  clearItems();
+  const info = document.getElementById('info');
+  if (selected < 0 || !items[selected] || items[selected].error){
+    info.innerHTML = 'Paste your item list on the left — the 3D view updates automatically.';
+    return;
+  }
+  const it = items[selected];
+  buildItemScene(it);
+  if (it.known === 3){
+    if (it.status === 'no'){
+      let html = '<b>' + esc(it.name) + '</b><br>' + dimStr(it) + ' mm<br>' +
+        '<span style="color:#fca5a5;font-weight:600">Does not fit in any orientation.</span>';
+      if (it.diagNote) html += '<br><span style="color:#fcd34d">' + it.diagNote + '</span>';
+      info.innerHTML = html; return;
+    }
+    if (it.status === 'door'){
+      info.innerHTML = '<b>' + esc(it.name) + '</b><br>' +
+        'Item: ' + dimStr(it) + ' mm<br>' +
+        '<span style="color:#fdba74;font-weight:600">Fits the car, but not through the door.</span><br>' +
+        it.doorNote + '<br><i style="color:#94a3b8">Orange = item in car · red outline = its cross-section at the door plane.</i>';
+      return;
+    }
+    const o = it.best;
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>' +
+      'Item: ' + dimStr(it) + ' mm<br>' +
+      'Placed: ' + o.d + ' deep × ' + o.w + ' wide × ' + o.h + ' high<br>' +
+      'Rotation: <b>' + (it.status === 'fit' ? 'none' : o.desc) + '</b><br>' +
+      'Clearance — depth: <b>' + it.margin.d + '</b> · width: <b>' + it.margin.w +
+      '</b> · height: <b>' + it.margin.h + '</b> mm<br>' +
+      'Door — passes with ' + (door.w - o.w) + ' mm width and ' + (door.h - o.h) + ' mm height to spare.' +
+      (it.status === 'rot' ? '<br><i style="color:#94a3b8">Grey ghost = as-entered orientation.</i>' : '');
+  } else if (it.known === 1){
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>Only length known: ' + it.l + ' mm — shown as a line.<br>' +
+      '<b>' + it.lineFit.desc + '.</b><br>Add W and H in the table for a full fit + door check.';
+  } else if (it.known === 2){
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>Length + width known: ' + it.l + ' × ' + it.w +
+      ' mm — shown as a floor outline.<br><b>' + it.rectFit.desc + '.</b><br>Add H in the table for a full fit + door check.';
+  } else {
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>No dimensions — fill them in in the table.';
+  }
+}
+function showAll(){
+  clearItems();
+  let x = 0, z = 0, rowD = 0, outside = 0, placed = 0, partials = 0, doorN = 0, totalVol = 0;
+  const gap = 40;
+  const outX = () => lift.w/2 + 800 + (outside % 3) * 500;
+  const outZ = () => lift.d/2 + 600 + Math.floor(outside/3) * 1000;
+  items.forEach((it, i) => {
+    if (it.error) return;
+    if (it.known === 1){ lineMesh(it.l, new THREE.Vector3(0,0,1), new THREE.Vector3(outX(), 60, 0), 0x94a3b8); outside++; partials++; return; }
+    if (it.known === 2){ rectOutline(it.l, it.w, 0x94a3b8, outX(), outZ()); outside++; partials++; return; }
+    if (!it.best){
+      const col = it.status === 'door' ? 0xfb923c : 0xef4444;
+      boxMesh(it.carBest || orientations(it.l,it.w,it.h)[0], col, outX(), outZ(), .6);
+      outside++; if (it.status === 'door') doorN++;
+      return;
+    }
+    const o = it.best;
+    if (x + o.w > lift.w + 1){ z += rowD + gap; x = 0; rowD = 0; }
+    if (z + o.d > lift.d + 1){ boxMesh(o, 0xef4444, outX(), outZ(), .6); outside++; return; }
+    boxMesh(o, palette[i % palette.length], -lift.w/2 + x + o.w/2, -lift.d/2 + z + o.d/2);
+    x += o.w + gap; rowD = Math.max(rowD, o.d);
+    placed++; totalVol += vol(o);
+  });
+  const carVol = lift.d * lift.w * lift.h;
+  document.getElementById('info').innerHTML =
+    '<b>All items together</b><br>' + placed + ' of ' + items.length + ' items fit in one load · ' +
+    (totalVol/1e9).toFixed(2) + ' m³ of ' + (carVol/1e9).toFixed(2) + ' m³ (' +
+    Math.round(totalVol/carVol*100) + '% by volume)' +
+    (doorN ? '<br><span style="color:#fdba74">' + doorN + ' item(s) fit the car but can\'t pass the door.</span>' : '') +
+    (partials ? '<br><span style="color:#93c5fd">' + partials + ' incomplete item(s) shown outside as line/outline.</span>' : '') +
+    (outside - partials - doorN > 0 ? '<br><span style="color:#fca5a5">' + (outside - partials - doorN) + ' item(s) outside — need another trip or won\'t fit.</span>' : '');
+}
+
+// ---------------- parsing & table ----------------
+function parse(text) {
+  return CLM_CORE.dims.parseItems(text);
+}
+function statusText(it){
+  if (it.error) return 'NO DATA';
+  if (it.known === 1) return 'LENGTH ONLY — ' + it.lineFit.desc;
+  if (it.known === 2) return 'NO HEIGHT — ' + it.rectFit.desc;
+  if (it.status === 'door') return 'FITS CAR, NOT DOOR — ' + it.doorNote;
+  return it.status === 'fit' ? 'FITS as entered' : it.status === 'rot' ? 'FITS rotated' : 'NO FIT';
+}
+function rotText(it){
+  if (it.error) return '';
+  if (it.known === 1) return it.lineFit.place;
+  if (it.known === 2) return it.rectFit.desc;
+  if (it.status === 'door') return it.carBest.desc + ' — blocked by door';
+  return it.status === 'fit' ? 'none' : (it.best ? it.best.desc : 'does not fit in any orientation');
+}
+function renderSummary(){
+  const fitN = items.filter(isFit).length;
+  const noN  = items.filter(isNoFit).length;
+  const rest = items.length - fitN - noN;
+  document.getElementById('summary').innerHTML = items.length
+    ? items.length + ' rows · <span style="color:#86efac">' + fitN + ' fit</span> · <span style="color:#fca5a5">' +
+      noN + " don't fit</span>" + (rest ? ' · ' + rest + ' unconfirmed (missing/partial data)' : '')
+    : '';
+}
+function renderTable(){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    const dimCell = [['l',it.l],['w',it.w],['h',it.h]].map(([kk,v]) =>
+      v > 0 ? '<b>' + v + '</b>'
+            : '<input class="mini" data-k="' + kk + '" type="number" placeholder="' + kk.toUpperCase() + '">'
+    ).join('×');
+    let chip;
+    if (it.error) chip = '<span class="chip miss">No dims</span>';
+    else if (it.known === 1) chip = '<span class="chip part">Length only</span>';
+    else if (it.known === 2) chip = '<span class="chip part">No height</span>';
+    else chip = it.status === 'fit' ? '<span class="chip fit">Fits</span>'
+        : it.status === 'rot' ? '<span class="chip rot">Fits · rotated</span>'
+        : it.status === 'door' ? '<span class="chip door">Fits car · not door</span>'
+        : '<span class="chip no">No fit</span>';
+    const rotCol = it.error ? '' : (it.known === 3 ? (it.best ? esc(it.best.short)
+                 : it.carBest ? esc(it.carBest.short) + ' (door blocks)' : '—')
+                 : it.known === 2 ? esc(it.rectFit.short) : esc(it.lineFit.short));
+    tr.innerHTML = '<td>' + (i+1) + '</td><td>' + esc(it.name) + '</td><td>' + dimCell +
+                   '</td><td>' + chip + '</td><td>' + rotCol + '</td>';
+    tr.querySelectorAll('input.mini').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const v = +inp.value;
+        if (isFinite(v) && v > 0){ it[inp.dataset.k] = v; checkItem(it); refresh(); }
+      });
+    });
+    tr.onclick = () => { selected = i; mode = 'one'; syncModeButtons(); renderTable(); showOne(); };
+    if (i === selected && mode === 'one') tr.className = 'sel';
+    tb.appendChild(tr);
+  });
+  renderSummary();
+}
+function refresh(){ renderTable(); mode === 'all' ? showAll() : showOne(); }
+
+// ---------------- keyboard rolling ----------------
+function moveSelection(delta){
+  if (!items.length) return;
+  selected = ((selected < 0 ? 0 : selected) + delta + items.length) % items.length;
+  mode = 'one'; syncModeButtons(); renderTable(); showOne();
+  const tr = document.querySelector('#tbody tr.sel');
+  if (tr) tr.scrollIntoView({ block:'nearest' });
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return; // never hijack typing
+  e.preventDefault();
+  moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+});
+
+// ---------------- exports (respect report scope) ----------------
+function buildRows(){
+  const list = scopeItems();
+  const rows = [];
+  rows.push(['Car D x W x H (mm)', lift.d + ' x ' + lift.w + ' x ' + lift.h]);
+  rows.push(['Door W x H (mm)', door.w + ' x ' + door.h]);
+  rows.push(['Report scope', scopeLabel()]);
+  rows.push(['Exported', new Date().toLocaleString()]);
+  rows.push([]);
+  rows.push(['Row','Item','Unit','L','W','H','Fits','Rotation / placement','Placed D x W x H',
+             'Clearance depth','Clearance width','Clearance height','Notes']);
+  list.forEach(({ it, idx }) => {
+    const unit = unitOf(it);
+    if (it.error){ rows.push([idx, it.name, unit,'','','','NO DATA','','','','','','dimensions missing in source']); return; }
+    const fits = it.known === 3
+      ? (it.status === 'fit' ? 'YES' : it.status === 'rot' ? 'YES (ROTATED)'
+         : it.status === 'door' ? 'CAR YES / DOOR NO' : 'NO')
+      : 'PARTIAL — ' + (it.known === 1 ? it.lineFit.desc : it.rectFit.desc);
+    rows.push([idx, it.name, unit, it.l||'', it.w||'', it.h||'', fits, rotText(it),
+      it.best ? it.best.d + ' x ' + it.best.w + ' x ' + it.best.h : '',
+      it.margin ? it.margin.d : '', it.margin ? it.margin.w : '', it.margin ? it.margin.h : '',
+      it.doorNote || it.diagNote || (it.known < 3 ? 'incomplete dimensions — add missing values for a full check' : '')]);
+  });
+  return rows;
+}
+const csvEsc = CLM_CORE.export.csvEsc;
+function flash(msg){
+  const f = document.getElementById('flash');
+  f.textContent = msg; f.style.opacity = 1;
+  setTimeout(() => f.style.opacity = 0, 2500);
+}
+document.getElementById('csv').onclick = () => {
+  if (!scopeItems().length){ flash('No items in this scope.'); return; }
+  CLM_CORE.export.downloadText('otter-fit-results.csv', CLM_CORE.export.toCSV(buildRows()), 'text/csv;charset=utf-8');
+  flash('CSV downloaded (' + scopeItems().length + ' items).');
+};
+document.getElementById('copy').onclick = () => {
+  if (!scopeItems().length){ flash('No items in this scope.'); return; }
+  const tsv = CLM_CORE.export.toTSV(buildRows());
+  const done = () => flash('Copied — paste into Excel.');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done);
+  else {
+    const t = document.createElement('textarea');
+    t.value = tsv; document.body.appendChild(t); t.select();
+    document.execCommand('copy'); document.body.removeChild(t); done();
+  }
+};
+// ---- compact PDF: one table, small JPEG thumbnails ----
+function captureItem(it){
+  if (!threeOK || it.known < 1) return null;
+  clearItems();
+  buildItemScene(it);
+  const savedPos = camera.position.clone(), savedAspect = camera.aspect, savedRatio = renderer.getPixelRatio();
+  camera.position.set(5600, 4300, 6600);
+  camera.aspect = 1.5; camera.updateProjectionMatrix();
+  camera.lookAt(0, lift.h*0.35, 0);
+  renderer.setPixelRatio(1);
+  renderer.setSize(480, 320, false);
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/jpeg', 0.72);
+  camera.position.copy(savedPos);
+  camera.aspect = savedAspect; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(savedRatio);
+  renderer.setSize(viewport.clientWidth, viewport.clientHeight, false);
+  return url;
+}
+document.getElementById('pdf').onclick = () => {
+  if (!window.jspdf){ flash('PDF library not loaded (internet needed once).'); return; }
+  const list = scopeItems();
+  if (!list.length){ flash('No items in this scope.'); return; }
+  const doc = new window.jspdf.jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const X = { name:9, id:76, dims:106, res:142, img:248 };
+  const W = { name:65, id:28, dims:34, res:104, img:40 };
+  function head(y){
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text('Name', X.name, y); doc.text('ID', X.id, y); doc.text('Dims (mm)', X.dims, y);
+    doc.text('Result', X.res, y); doc.text('Fit view', X.img, y);
+    doc.setFont('helvetica','normal');
+    doc.setDrawColor(120); doc.line(8, y + 1.5, 289, y + 1.5);
+    return y + 1.5;
+  }
+  doc.setFontSize(15); doc.text('Otter Fit — Lift Car Load Report', 9, 12);
+  doc.setFontSize(9);
+  doc.text('Car ' + lift.d + ' x ' + lift.w + ' x ' + lift.h + ' mm   Door ' + door.w + ' x ' + door.h +
+           ' mm   Scope: ' + scopeLabel() + '   ' + new Date().toLocaleString(), 9, 18);
+  let y = head(25) + 3;
+
+  list.forEach(({ it }) => {
+    const nid = nameId(it);
+    const img = captureItem(it);
+    doc.setFontSize(7.5);
+    const nameL = doc.splitTextToSize(nid.name, W.name);
+    const resL = [];
+    resultLines(it).forEach(s => resL.push(...doc.splitTextToSize(s, W.res)));
+    const textH = Math.max(nameL.length, resL.length) * 3.6 + 3;
+    const rowH = Math.max(textH, img ? 29 : 10, 11);
+    if (y + rowH > 200){ doc.addPage(); y = head(15) + 3; }
+    doc.text(nameL, X.name, y + 5);
+    doc.text(nid.id, X.id, y + 5);
+    doc.text(dimStr(it), X.dims, y + 5);
+    doc.text(resL, X.res, y + 5);
+    if (img) doc.addImage(img, 'JPEG', X.img, y + 1, W.img, 26.7);
+    doc.setDrawColor(190); doc.line(8, y + rowH, 289, y + rowH);
+    y += rowH;
+  });
+  doc.save('otter-fit-report.pdf');
+  refresh();
+  flash('PDF downloaded (' + list.length + ' rows).');
+};
+
+// ---------------- CLM/1 suite hand-off ----------------
+let clmProject = '';
+function unitOf(it){
+  return it.name && it.name.indexOf('\uD83D\uDCE6 ') === 0 ? 'container' : 'item';
+}
+function clmResultOf(it){
+  if (it.error) return 'no-data';
+  if (it.known === 1) return 'partial — length only (' + it.lineFit.short + ')';
+  if (it.known === 2) return 'partial — no height (' + it.rectFit.short + ')';
+  return it.status === 'fit' ? 'fit' : it.status === 'rot' ? 'fit-rotated'
+       : it.status === 'door' ? 'car-yes-door-no' : 'no-fit';
+}
+function exportCLM(){
+  const mItems = [], checks = [];
+  items.forEach((it, i) => {
+    const nid = nameId(it);
+    const isUnit = unitOf(it) === 'container';
+    mItems.push({
+      id: nid.id || ('item-' + (i + 1)),
+      name: it.name,
+      unit: isUnit ? 'container' : 'item',
+      dims: { l: it.l || null, w: it.w || null, h: it.h || null },
+      dimsAssumed: false
+    });
+    if (it.error) return;
+    checks.push({
+      item: it.name,
+      unit: isUnit ? 'container' : 'item',
+      against: 'car',
+      result: clmResultOf(it),
+      rotation: it.best ? it.best.short : (it.carBest ? it.carBest.short : ''),
+      crossSection: (it.status === 'door' && it.carBest) ? [it.carBest.w, it.carBest.h] : undefined,
+      doorClearance: it.best ? { w: door.w - it.best.w, h: door.h - it.best.h } : undefined,
+      notes: it.doorNote || it.diagNote || (it.known < 3 ? 'incomplete dimensions' : '')
+    });
+  });
+  const m = CLM.make(
+    clmProject || ('Transport check ' + new Date().toLocaleDateString()),
+    'otter-fit',
+    mItems,
+    [{ id: 'Car', kind: 'vehicle', l: lift.d, w: lift.w, h: lift.h,
+       external: true, door: { w: door.w, h: door.h } }],
+    checks);
+  CLM.download(m, (clmProject || 'otter-fit').replace(/[^\w\-]+/g, '_') + '-manifest.json');
+  CLM.handoff(m);
+  flash('Manifest downloaded.');
+}
+function loadCLMManifest(m){
+  const veh = (m.containers || []).find(c => c && c.kind === 'vehicle');
+  if (veh){
+    lift.d = +veh.l || lift.d; lift.w = +veh.w || lift.w; lift.h = +veh.h || lift.h;
+    if (veh.door){ door.w = +veh.door.w || door.w; door.h = +veh.door.h || door.h; }
+    document.getElementById('ld').value = lift.d;
+    document.getElementById('lw').value = lift.w;
+    document.getElementById('lh').value = lift.h;
+    document.getElementById('dw').value = door.w;
+    document.getElementById('dh').value = door.h;
+    buildLift();
+  }
+
+  // Phase 1: manifests are checked at container level — the crates/boxes
+  // that physically get moved — unless the user also wants the items inside.
+  const units = (m.containers || []).filter(c => c && (c.kind === 'crate' || c.kind === 'box' || c.kind === 'tray')
+    && +c.l > 0 && +c.w > 0 && +c.h > 0);
+  const srcItems = (m.items || []).filter(it => it && it.name && it.dims);
+  const incItems = !!document.getElementById('clm-inc-items').checked;
+
+  let rows = [], note = '';
+  if (units.length && !incItems){
+    rows = units.map(c => ({ name: '\uD83D\uDCE6 ' + c.id, dims: c }));
+    note = srcItems.length
+      ? ` \u2014 checking the ${units.length} container(s) that get moved (tick \u201calso check source items\u201d for the ${srcItems.length} item(s) inside)`
+      : '';
+  } else {
+    rows = units.map(c => ({ name: '\uD83D\uDCE6 ' + c.id, dims: c }))
+      .concat(srcItems.map(it => ({ name: it.name, dims: it.dims })));
+    if (units.length) note = ` \u2014 ${units.length} container(s) + ${srcItems.length} item(s)`;
+  }
+
+  const lines = rows.map(r => {
+    const d = r.dims;
+    return [r.name, d.l, d.w, d.h].filter(v => v !== null && v !== undefined && v !== '').join(',');
+  });
+  if (!lines.length){ flash('Manifest has no usable rows.'); return; }
+  document.getElementById('data').value = lines.join('\n');
+  clmProject = m.project ? String(m.project) : '';
+  goBtn.onclick();
+  flash(`Loaded ${lines.length} row(s) from manifest${note}.`);
+}
+function handleCLMFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadCLMManifest(CLM.parse(reader.result)); }
+    catch (err){ flash('Not a valid clm/1 manifest.'); }
+  };
+  reader.readAsText(file);
+}
+
+// ---------------- wiring ----------------
+const goBtn = document.getElementById('go');
+goBtn.onclick = (ev) => {
+  items = parse(document.getElementById('data').value);
+  items.forEach(it => { if (!it.error) checkItem(it); });
+  if (selected < 0 || !items[selected] || items[selected].error)
+    selected = items.findIndex(it => !it.error);
+  refresh();
+  if (ev) document.getElementById('table-wrap').focus(); // real click: hand arrow keys to the list
+};
+const ta = document.getElementById('data');
+let deb;
+ta.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(() => goBtn.onclick(), 350); });
+const bOne = document.getElementById('viewOne'), bAll = document.getElementById('viewAll');
+function syncModeButtons(){
+  bOne.classList.toggle('active', mode === 'one');
+  bAll.classList.toggle('active', mode === 'all');
+}
+bOne.onclick = () => { mode = 'one'; syncModeButtons(); renderTable(); showOne(); };
+bAll.onclick = () => { mode = 'all'; syncModeButtons(); renderTable(); showAll(); };
+['repAll','repFit','repNo'].forEach(id => {
+  document.getElementById(id).onclick = () => {
+    reportScope = id === 'repAll' ? 'all' : id === 'repFit' ? 'fit' : 'no';
+    ['repAll','repFit','repNo'].forEach(j =>
+      document.getElementById(j).classList.toggle('active', j === id));
+    flash('Report scope: ' + scopeLabel());
+  };
+});
+['ld','lw','lh','dw','dh'].forEach(id => {
+  document.getElementById(id).onchange = () => {
+    lift.d = +document.getElementById('ld').value || lift.d;
+    lift.w = +document.getElementById('lw').value || lift.w;
+    lift.h = +document.getElementById('lh').value || lift.h;
+    door.w = +document.getElementById('dw').value || door.w;
+    door.h = +document.getElementById('dh').value || door.h;
+    buildLift();
+    items.forEach(it => { if (!it.error) checkItem(it); });
+    refresh();
+  };
+});
+document.getElementById('clm-out').onclick = exportCLM;
+document.getElementById('clm-in').onclick = () => document.getElementById('clm-file').click();
+document.getElementById('clm-file').onchange = e => {
+  if (e.target.files[0]) handleCLMFile(e.target.files[0]);
+  e.target.value = '';
+};
+CLM.offerBanner('otter-fit', loadCLMManifest);
+
+// vehicle presets from clm-library.js
+const vpSel = document.getElementById('vpreset');
+(window.CLM_LIBRARY && CLM_LIBRARY.vehicles ? CLM_LIBRARY.vehicles : []).forEach((v, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = `${v.name} \u2014 ${v.d} \u00d7 ${v.w} \u00d7 ${v.h} \u00b7 door ${v.doorW} \u00d7 ${v.doorH}`;
+  vpSel.appendChild(o);
+});
+vpSel.onchange = () => {
+  const v = (window.CLM_LIBRARY && CLM_LIBRARY.vehicles ? CLM_LIBRARY.vehicles : [])[+vpSel.value];
+  if (!v) return;
+  document.getElementById('ld').value = v.d;
+  document.getElementById('lw').value = v.w;
+  document.getElementById('lh').value = v.h;
+  document.getElementById('dw').value = v.doorW;
+  document.getElementById('dh').value = v.doorH;
+  document.getElementById('ld').onchange();
+  vpSel.selectedIndex = 0;
+};
+
+document.getElementById('sample').onclick = () => {
+  ta.value =
+`Landau carriage(id1),3810,1730,2110
+Cobb and Co Coach(id2),3800,2100,2900
+Hansom Cab(id3),2400
+Whale boat(id4),9850,1665,1140`;
+  goBtn.onclick();
+};
+if (threeOK){ resize(); buildLift(); (function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})(); }
+</script>
+</body>
+</html>

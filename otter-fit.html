@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otter Fit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦦</text></svg>">
+<style>
+  :root { --bg:#0f172a; --panel:#111c33; --line:#253352; --text:#e2e8f0;
+          --muted:#94a3b8; --accent:#38bdf8; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg);
+         color:var(--text); height:100vh; display:flex; flex-direction:column; }
+  header { padding:10px 16px; border-bottom:1px solid var(--line);
+           display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; font-weight:600; }
+  .tag { font-size:12px; color:var(--muted); font-style:italic; }
+  header .dims { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--muted); }
+  header input { width:72px; background:#0b1226; color:var(--text); border:1px solid var(--line);
+                 border-radius:6px; padding:4px 6px; font-size:13px; }
+  main { flex:1; display:flex; min-height:0; }
+  aside { width:500px; min-width:360px; border-right:1px solid var(--line);
+          display:flex; flex-direction:column; background:var(--panel); }
+  aside .pad { padding:12px; }
+  textarea { width:100%; height:110px; resize:vertical; background:#0b1226; color:var(--text);
+             border:1px solid var(--line); border-radius:8px; padding:8px;
+             font:12px/1.5 Consolas,monospace; }
+  .btnrow { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  button { background:#1e293b; border:1px solid var(--line); color:var(--text);
+           padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; }
+  button:hover { border-color:var(--accent); }
+  button.active, button.primary { background:var(--accent); border-color:var(--accent);
+           color:#082f49; font-weight:600; }
+  .suite-link { background:#1e293b; border:1px solid var(--line); color:var(--text);
+           padding:7px 12px; border-radius:8px; font-size:13px; text-decoration:none;
+           margin-left:auto; white-space:nowrap; }
+  .suite-link:hover { border-color:var(--accent); }
+  .lbl { font-size:12px; color:var(--muted); }
+  #flash { font-size:12px; color:#86efac; opacity:0; transition:opacity .4s; }
+  #summary { font-size:12px; color:var(--muted); margin-top:8px; }
+  #table-wrap { flex:1; overflow:auto; }
+  #table-wrap:focus { outline:2px solid #1e3a5f; outline-offset:-2px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { padding:6px 8px; text-align:left; border-top:1px solid var(--line); white-space:nowrap; }
+  th { position:sticky; top:0; background:var(--panel); color:var(--muted); font-weight:600; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:#16233f; }
+  tbody tr.sel { background:#12314f; }
+  .chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .chip.fit { background:#14532d; color:#86efac; }
+  .chip.rot { background:#57340a; color:#fcd34d; }
+  .chip.door{ background:#7c2d12; color:#fdba74; }
+  .chip.no  { background:#5f1616; color:#fca5a5; }
+  .chip.part{ background:#1e3a5f; color:#93c5fd; }
+  .chip.miss{ background:#334155; color:#cbd5e1; }
+  .mini { width:52px; background:#0b1226; color:var(--text); border:1px solid var(--line);
+          border-radius:5px; padding:2px 4px; font-size:12px; }
+  #viewport { flex:1; position:relative; min-width:0; }
+  canvas { display:block; }
+  #info { position:absolute; top:12px; left:12px; background:rgba(10,16,32,.85);
+          border:1px solid var(--line); border-radius:10px; padding:10px 14px;
+          font-size:13px; max-width:420px; backdrop-filter:blur(4px); }
+  #info b { color:var(--accent); }
+  #legend { position:absolute; bottom:12px; left:12px; background:rgba(10,16,32,.85);
+            border:1px solid var(--line); border-radius:10px; padding:8px 12px;
+            font-size:12px; color:var(--muted); max-width:75%; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦦 Otter Fit</h1>
+  <span class="tag">…because everything otter fit.</span>
+  <div class="dims">
+    <select id="vpreset" title="Vehicle presets come from clm-library.js" style="width:auto;background:#0b1226;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px;">
+      <option value="">— Vehicle preset —</option>
+    </select>
+    Car (mm): D <input id="ld" type="number" value="4400" step="10">
+    W <input id="lw" type="number" value="2100" step="10">
+    H <input id="lh" type="number" value="2500" step="10">
+    &nbsp; Door (mm): W <input id="dw" type="number" value="1800" step="10">
+    H <input id="dh" type="number" value="2400" step="10">
+  </div>
+  <a class="suite-link" href="suite.html" title="Back to the Collection Logistics Suite">Back to Hub</a>
+</header>
+<main>
+<aside>
+  <div class="pad">
+    <textarea id="data" placeholder="Paste items, one per line — straight from Excel is fine:&#10;Name, length, width, height&#10;1 number = length (shown as a line) · 2 numbers = length+width (floor outline)"></textarea>
+    <div class="btnrow">
+      <button class="primary" id="go">Visualise</button>
+      <button id="sample">Load sample</button>
+      <button id="viewOne" class="active">Selected item</button>
+      <button id="viewAll">All items</button>
+    </div>
+    <div class="btnrow">
+      <span class="lbl">Report:</span>
+      <button id="repAll" class="active">All</button>
+      <button id="repFit">Fit</button>
+      <button id="repNo">Don't fit</button>
+      <button id="pdf">📄 PDF</button>
+      <button id="csv"> CSV</button>
+      <button id="copy">⧉ Copy</button>
+      <span id="flash"></span>
+    </div>
+    <div class="btnrow">
+      <span class="lbl">Suite:</span>
+      <button id="clm-in">📥 Load Manifest</button>
+      <button id="clm-out">📤 Send to…</button>
+      <input id="clm-file" type="file" accept=".json,application/json" style="display:none;">
+      <label class="lbl" style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="By default, manifests check the crates/boxes that physically get moved. Tick this to also check the individual items listed inside them.">
+        <input type="checkbox" id="clm-inc-items" style="width:auto;"> also check source items
+      </label>
+    </div>
+    <div class="hint">Tip: after Visualise, use ↑ / ↓ to roll through items one at a time. Every full-dimension item is checked for stowage in the car AND passage through the door.</div>
+    <div id="summary"></div>
+  </div>
+  <div id="table-wrap" tabindex="0">
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th>L×W×H</th><th>Status</th><th>Rotation / placement</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</aside>
+<section id="viewport">
+  <div id="info">Paste your item list on the left — the 3D view updates automatically.<br>Drag to orbit, scroll to zoom, right-drag to pan.</div>
+  <div id="legend">Green outline = car · blue = door (to scale) · grey ghost = as-entered · rod = length only · flat outline = no height yet · red outline at door = cross-section too big · click a row to inspect</div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="clm-core.js"></script>
+<script src="clm-library.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+
+
+<script type="module">
+// ---------------- shared three.js: one build for the whole suite ----------------
+let THREE = null, OrbitControls = null;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+} catch (e) { THREE = null; OrbitControls = null; }
+const threeOK = !!THREE && !!OrbitControls;
+
+// ---------------- state ----------------
+const lift = { d:4400, w:2100, h:2500 };
+const door = { w:1800, h:2400 };
+let items = [], selected = -1, mode = 'one', reportScope = 'all';
+let liftGroup = null, itemMeshes = [];
+
+// ---------------- three.js setup ----------------
+let scene, camera, renderer, controls;
+const viewport = document.getElementById('viewport');
+
+if (threeOK){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f172a);
+  camera = new THREE.PerspectiveCamera(45, 1, 10, 80000);
+  camera.position.set(5200, 4200, 6400);
+  renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+  viewport.appendChild(renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 1000, 0);
+  controls.enableDamping = true;
+  scene.add(new THREE.AmbientLight(0xffffff, .55));
+  const dl0 = new THREE.DirectionalLight(0xffffff, .75);
+  dl0.position.set(6000, 9000, 5000);
+  scene.add(dl0);
+  scene.add(new THREE.GridHelper(12000, 24, 0x334155, 0x1e293b));
+  window.addEventListener('resize', resize);
+} else {
+  document.getElementById('info').innerHTML =
+    '⚠ 3D library could not load (internet needed once for the CDN).<br>Table, CSV and text-only PDF still work.';
+}
+function resize(){
+  if (!threeOK) return;
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+function label(text, color, size){
+  color = color || '#e2e8f0'; size = size || 560;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.font = 'bold 64px Segoe UI, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = color; g.fillText(text, 256, 64);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), depthTest:false }));
+  s.scale.set(size, size/4, 1);
+  return s;
+}
+function buildLift(){
+  if (!threeOK) return;
+  if (liftGroup){
+    scene.remove(liftGroup);
+    liftGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  liftGroup = new THREE.Group();
+  const box = new THREE.BoxGeometry(lift.w, lift.h, lift.d);
+  const shell = new THREE.Mesh(box, new THREE.MeshLambertMaterial({
+    color:0x38bdf8, transparent:true, opacity:.07, side:THREE.DoubleSide, depthWrite:false }));
+  shell.position.y = lift.h/2; liftGroup.add(shell);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box),
+    new THREE.LineBasicMaterial({ color:0x22c55e }));
+  edges.position.y = lift.h/2; liftGroup.add(edges);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(lift.w, lift.d),
+    new THREE.MeshLambertMaterial({ color:0x14532d, transparent:true, opacity:.35, side:THREE.DoubleSide }));
+  floor.rotation.x = -Math.PI/2; floor.position.y = 2; liftGroup.add(floor);
+
+  const dw = Math.min(door.w, lift.w), dh = Math.min(door.h, lift.h);
+  const doorMesh = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
+    new THREE.MeshBasicMaterial({ color:0x38bdf8, transparent:true, opacity:.12, side:THREE.DoubleSide }));
+  doorMesh.position.set(0, dh/2, lift.d/2 - 1);
+  liftGroup.add(doorMesh);
+  const dpts = [ new THREE.Vector3(-dw/2,0,lift.d/2-1), new THREE.Vector3(dw/2,0,lift.d/2-1),
+                 new THREE.Vector3(dw/2,dh,lift.d/2-1), new THREE.Vector3(-dw/2,dh,lift.d/2-1) ];
+  liftGroup.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(dpts),
+    new THREE.LineBasicMaterial({ color:0x38bdf8 })));
+  const dlb = label('DOOR ' + door.w + ' × ' + door.h, '#7dd3fc', 520);
+  dlb.position.set(0, lift.h + 260, lift.d/2);
+  liftGroup.add(dlb);
+
+  const lw = label(lift.w + ' mm wide', '#94a3b8'); lw.position.set(0, -280, lift.d/2 + 260);
+  const ld = label(lift.d + ' mm deep', '#94a3b8'); ld.position.set(lift.w/2 + 460, -280, 0);
+  const lh = label(lift.h + ' mm high', '#94a3b8'); lh.position.set(-lift.w/2 - 460, lift.h/2, lift.d/2);
+  liftGroup.add(lw, ld, lh);
+  scene.add(liftGroup);
+  controls.target.set(0, lift.h*0.4, 0);
+}
+
+// ---------------- fit logic: car stowage AND door passage ----------------
+function orientations(l, w, h) {
+  return CLM_CORE.dims.orientations(l, w, h);
+}
+function checkItem(it) {
+  CLM_CORE.fit.checkItem(it, lift, door);
+}
+// ---------------- report scoping ----------------
+function isFit(it){ return !it.error && it.known === 3 && !!it.best; }
+function isNoFit(it){
+  if (it.error) return false;
+  if (it.known === 3) return !it.best;
+  if (it.known === 1) return it.lineFit.type === 'none';
+  if (it.known === 2) return !it.rectFit.fits;
+  return false;
+}
+function scopeItems(){
+  const arr = items.map((it, i) => ({ it, idx: i + 1 }));
+  if (reportScope === 'fit') return arr.filter(x => isFit(x.it));
+  if (reportScope === 'no')  return arr.filter(x => isNoFit(x.it));
+  return arr;
+}
+const scopeLabel = () => reportScope === 'all' ? 'All items'
+  : reportScope === 'fit' ? 'Items that fit'
+  : "Items that don't fit (confirmed)";
+
+// ---------------- drawing ----------------
+const palette = [0x38bdf8,0xa78bfa,0xf472b6,0xfbbf24,0x34d399,0xfb7185,0x60a5fa,0xfacc15,0x4ade80,0xc084fc];
+function clearItems(){
+  if (!threeOK) return;
+  itemMeshes.forEach(m => {
+    m.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); });
+    scene.remove(m);
+  });
+  itemMeshes = [];
+}
+function boxMesh(o, color, cx, cz, opacity){
+  if (!threeOK) return;
+  opacity = opacity === undefined ? 0.85 : opacity;
+  const g = new THREE.BoxGeometry(o.w, o.h, o.d);
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, transparent:true, opacity }));
+  m.position.set(cx, o.h/2, cz);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
+    new THREE.LineBasicMaterial({ color:0x0f172a })));
+  scene.add(m); itemMeshes.push(m);
+}
+function ghostMesh(o){
+  if (!threeOK) return;
+  const g = new THREE.BoxGeometry(o.w, o.h, o.d);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color:0x94a3b8, transparent:true, opacity:.10, depthWrite:false }));
+  m.position.set(0, o.h/2, 0);
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g),
+    new THREE.LineBasicMaterial({ color:0x94a3b8 })));
+  scene.add(m); itemMeshes.push(m);
+}
+function crossOutline(w, h, color){
+  if (!threeOK) return;
+  const pts = [ new THREE.Vector3(-w/2,0,0), new THREE.Vector3(w/2,0,0),
+                new THREE.Vector3(w/2,h,0), new THREE.Vector3(-w/2,h,0) ];
+  const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color }));
+  loop.position.set(0, 0, lift.d/2 - 3);
+  scene.add(loop); itemMeshes.push(loop);
+}
+function lineMesh(len, dir, center, color){
+  if (!threeOK) return;
+  const d = dir.clone().normalize();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(25, 25, len, 12),
+    new THREE.MeshLambertMaterial({ color, transparent:true, opacity:.95 }));
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d);
+  m.position.copy(center);
+  scene.add(m); itemMeshes.push(m);
+  const sg = new THREE.SphereGeometry(60, 12, 12);
+  [-1,1].forEach(s => {
+    const sp = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color }));
+    sp.position.copy(center).add(d.clone().multiplyScalar(s*len/2));
+    scene.add(sp); itemMeshes.push(sp);
+  });
+}
+function rectOutline(L, W, color, cx, cz){
+  if (!threeOK) return;
+  cx = cx || 0; cz = cz || 0;
+  const pts = [ new THREE.Vector3(-W/2,5,-L/2), new THREE.Vector3(W/2,5,-L/2),
+                new THREE.Vector3(W/2,5,L/2), new THREE.Vector3(-W/2,5,L/2) ];
+  const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color }));
+  loop.position.set(cx, 0, cz);
+  scene.add(loop); itemMeshes.push(loop);
+}
+const esc = CLM.esc;
+const vol = o => o.d * o.w * o.h;
+const dimStr = CLM_CORE.dims.dimStr;
+function nameId(it){
+  const m = String(it.name).match(/\(([^)]*)\)\s*$/);
+  if (m) return { name: it.name.slice(0, m.index).trim() || it.name, id: m[1] };
+  return { name: it.name, id: '' };
+}
+function resultLines(it){
+  if (it.error) return ['NO DATA'];
+  if (it.known === 1) return ['LENGTH ONLY', it.lineFit.short];
+  if (it.known === 2) return ['NO HEIGHT', it.rectFit.short];
+  if (it.status === 'fit') return ['FITS', 'no rotation'];
+  if (it.status === 'rot') return ['FITS (ROTATED)', it.best.short];
+  if (it.status === 'door') return ['CAR YES / DOOR NO', it.carBest.short + ' - door blocks'];
+  return ['NO FIT'];
+}
+
+function buildItemScene(it){
+  if (it.known === 3){
+    if (it.status === 'no'){ boxMesh(orientations(it.l,it.w,it.h)[0], 0xef4444, 0, 0, .7); return; }
+    if (it.status === 'door'){
+      boxMesh(it.carBest, 0xfb923c, 0, 0, .8);
+      crossOutline(it.carBest.w, it.carBest.h, 0xef4444);
+      return;
+    }
+    if (it.status === 'rot') ghostMesh(orientations(it.l, it.w, it.h)[0]);
+    boxMesh(it.best, it.status === 'fit' ? 0x22c55e : 0xf59e0b, 0, 0);
+  } else if (it.known === 1){
+    const col = { depth:0x22c55e, floorDiag:0xf59e0b, bodyDiag:0xfb923c, none:0xef4444 }[it.lineFit.type];
+    let dirV, center;
+    if (it.lineFit.type === 'depth'){ dirV = new THREE.Vector3(0,0,1); center = new THREE.Vector3(0,60,0); }
+    else if (it.lineFit.type === 'floorDiag'){ dirV = new THREE.Vector3(lift.w,0,lift.d); center = new THREE.Vector3(0,60,0); }
+    else if (it.lineFit.type === 'bodyDiag'){ dirV = new THREE.Vector3(lift.w,lift.h,lift.d); center = new THREE.Vector3(0,lift.h/2,0); }
+    else { dirV = new THREE.Vector3(0,0,1); center = new THREE.Vector3(0,60,0); }
+    lineMesh(it.l, dirV, center, col);
+    const lb = label(it.l + ' mm', '#e2e8f0', 480);
+    lb.position.copy(center).add(new THREE.Vector3(0, 320, 0));
+    scene.add(lb); itemMeshes.push(lb);
+  } else if (it.known === 2){
+    const r = it.rectFit;
+    rectOutline(r.rot ? it.w : it.l, r.rot ? it.l : it.w, r.fits ? 0x22c55e : 0xef4444);
+  }
+}
+function showOne(){
+  clearItems();
+  const info = document.getElementById('info');
+  if (selected < 0 || !items[selected] || items[selected].error){
+    info.innerHTML = 'Paste your item list on the left — the 3D view updates automatically.';
+    return;
+  }
+  const it = items[selected];
+  buildItemScene(it);
+  if (it.known === 3){
+    if (it.status === 'no'){
+      let html = '<b>' + esc(it.name) + '</b><br>' + dimStr(it) + ' mm<br>' +
+        '<span style="color:#fca5a5;font-weight:600">Does not fit in any orientation.</span>';
+      if (it.diagNote) html += '<br><span style="color:#fcd34d">' + it.diagNote + '</span>';
+      info.innerHTML = html; return;
+    }
+    if (it.status === 'door'){
+      info.innerHTML = '<b>' + esc(it.name) + '</b><br>' +
+        'Item: ' + dimStr(it) + ' mm<br>' +
+        '<span style="color:#fdba74;font-weight:600">Fits the car, but not through the door.</span><br>' +
+        it.doorNote + '<br><i style="color:#94a3b8">Orange = item in car · red outline = its cross-section at the door plane.</i>';
+      return;
+    }
+    const o = it.best;
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>' +
+      'Item: ' + dimStr(it) + ' mm<br>' +
+      'Placed: ' + o.d + ' deep × ' + o.w + ' wide × ' + o.h + ' high<br>' +
+      'Rotation: <b>' + (it.status === 'fit' ? 'none' : o.desc) + '</b><br>' +
+      'Clearance — depth: <b>' + it.margin.d + '</b> · width: <b>' + it.margin.w +
+      '</b> · height: <b>' + it.margin.h + '</b> mm<br>' +
+      'Door — passes with ' + (door.w - o.w) + ' mm width and ' + (door.h - o.h) + ' mm height to spare.' +
+      (it.status === 'rot' ? '<br><i style="color:#94a3b8">Grey ghost = as-entered orientation.</i>' : '');
+  } else if (it.known === 1){
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>Only length known: ' + it.l + ' mm — shown as a line.<br>' +
+      '<b>' + it.lineFit.desc + '.</b><br>Add W and H in the table for a full fit + door check.';
+  } else if (it.known === 2){
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>Length + width known: ' + it.l + ' × ' + it.w +
+      ' mm — shown as a floor outline.<br><b>' + it.rectFit.desc + '.</b><br>Add H in the table for a full fit + door check.';
+  } else {
+    info.innerHTML = '<b>' + esc(it.name) + '</b><br>No dimensions — fill them in in the table.';
+  }
+}
+function showAll(){
+  clearItems();
+  let x = 0, z = 0, rowD = 0, outside = 0, placed = 0, partials = 0, doorN = 0, totalVol = 0;
+  const gap = 40;
+  const outX = () => lift.w/2 + 800 + (outside % 3) * 500;
+  const outZ = () => lift.d/2 + 600 + Math.floor(outside/3) * 1000;
+  items.forEach((it, i) => {
+    if (it.error) return;
+    if (it.known === 1){ lineMesh(it.l, new THREE.Vector3(0,0,1), new THREE.Vector3(outX(), 60, 0), 0x94a3b8); outside++; partials++; return; }
+    if (it.known === 2){ rectOutline(it.l, it.w, 0x94a3b8, outX(), outZ()); outside++; partials++; return; }
+    if (!it.best){
+      const col = it.status === 'door' ? 0xfb923c : 0xef4444;
+      boxMesh(it.carBest || orientations(it.l,it.w,it.h)[0], col, outX(), outZ(), .6);
+      outside++; if (it.status === 'door') doorN++;
+      return;
+    }
+    const o = it.best;
+    if (x + o.w > lift.w + 1){ z += rowD + gap; x = 0; rowD = 0; }
+    if (z + o.d > lift.d + 1){ boxMesh(o, 0xef4444, outX(), outZ(), .6); outside++; return; }
+    boxMesh(o, palette[i % palette.length], -lift.w/2 + x + o.w/2, -lift.d/2 + z + o.d/2);
+    x += o.w + gap; rowD = Math.max(rowD, o.d);
+    placed++; totalVol += vol(o);
+  });
+  const carVol = lift.d * lift.w * lift.h;
+  document.getElementById('info').innerHTML =
+    '<b>All items together</b><br>' + placed + ' of ' + items.length + ' items fit in one load · ' +
+    (totalVol/1e9).toFixed(2) + ' m³ of ' + (carVol/1e9).toFixed(2) + ' m³ (' +
+    Math.round(totalVol/carVol*100) + '% by volume)' +
+    (doorN ? '<br><span style="color:#fdba74">' + doorN + ' item(s) fit the car but can\'t pass the door.</span>' : '') +
+    (partials ? '<br><span style="color:#93c5fd">' + partials + ' incomplete item(s) shown outside as line/outline.</span>' : '') +
+    (outside - partials - doorN > 0 ? '<br><span style="color:#fca5a5">' + (outside - partials - doorN) + ' item(s) outside — need another trip or won\'t fit.</span>' : '');
+}
+
+// ---------------- parsing & table ----------------
+function parse(text) {
+  return CLM_CORE.dims.parseItems(text);
+}
+function statusText(it){
+  if (it.error) return 'NO DATA';
+  if (it.known === 1) return 'LENGTH ONLY — ' + it.lineFit.desc;
+  if (it.known === 2) return 'NO HEIGHT — ' + it.rectFit.desc;
+  if (it.status === 'door') return 'FITS CAR, NOT DOOR — ' + it.doorNote;
+  return it.status === 'fit' ? 'FITS as entered' : it.status === 'rot' ? 'FITS rotated' : 'NO FIT';
+}
+function rotText(it){
+  if (it.error) return '';
+  if (it.known === 1) return it.lineFit.place;
+  if (it.known === 2) return it.rectFit.desc;
+  if (it.status === 'door') return it.carBest.desc + ' — blocked by door';
+  return it.status === 'fit' ? 'none' : (it.best ? it.best.desc : 'does not fit in any orientation');
+}
+function renderSummary(){
+  const fitN = items.filter(isFit).length;
+  const noN  = items.filter(isNoFit).length;
+  const rest = items.length - fitN - noN;
+  document.getElementById('summary').innerHTML = items.length
+    ? items.length + ' rows · <span style="color:#86efac">' + fitN + ' fit</span> · <span style="color:#fca5a5">' +
+      noN + " don't fit</span>" + (rest ? ' · ' + rest + ' unconfirmed (missing/partial data)' : '')
+    : '';
+}
+function renderTable(){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    const dimCell = [['l',it.l],['w',it.w],['h',it.h]].map(([kk,v]) =>
+      v > 0 ? '<b>' + v + '</b>'
+            : '<input class="mini" data-k="' + kk + '" type="number" placeholder="' + kk.toUpperCase() + '">'
+    ).join('×');
+    let chip;
+    if (it.error) chip = '<span class="chip miss">No dims</span>';
+    else if (it.known === 1) chip = '<span class="chip part">Length only</span>';
+    else if (it.known === 2) chip = '<span class="chip part">No height</span>';
+    else chip = it.status === 'fit' ? '<span class="chip fit">Fits</span>'
+        : it.status === 'rot' ? '<span class="chip rot">Fits · rotated</span>'
+        : it.status === 'door' ? '<span class="chip door">Fits car · not door</span>'
+        : '<span class="chip no">No fit</span>';
+    const rotCol = it.error ? '' : (it.known === 3 ? (it.best ? esc(it.best.short)
+                 : it.carBest ? esc(it.carBest.short) + ' (door blocks)' : '—')
+                 : it.known === 2 ? esc(it.rectFit.short) : esc(it.lineFit.short));
+    tr.innerHTML = '<td>' + (i+1) + '</td><td>' + esc(it.name) + '</td><td>' + dimCell +
+                   '</td><td>' + chip + '</td><td>' + rotCol + '</td>';
+    tr.querySelectorAll('input.mini').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const v = +inp.value;
+        if (isFinite(v) && v > 0){ it[inp.dataset.k] = v; checkItem(it); refresh(); }
+      });
+    });
+    tr.onclick = () => { selected = i; mode = 'one'; syncModeButtons(); renderTable(); showOne(); };
+    if (i === selected && mode === 'one') tr.className = 'sel';
+    tb.appendChild(tr);
+  });
+  renderSummary();
+}
+function refresh(){ renderTable(); mode === 'all' ? showAll() : showOne(); }
+
+// ---------------- keyboard rolling ----------------
+function moveSelection(delta){
+  if (!items.length) return;
+  selected = ((selected < 0 ? 0 : selected) + delta + items.length) % items.length;
+  mode = 'one'; syncModeButtons(); renderTable(); showOne();
+  const tr = document.querySelector('#tbody tr.sel');
+  if (tr) tr.scrollIntoView({ block:'nearest' });
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return; // never hijack typing
+  e.preventDefault();
+  moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+});
+
+// ---------------- exports (respect report scope) ----------------
+function buildRows(){
+  const list = scopeItems();
+  const rows = [];
+  rows.push(['Car D x W x H (mm)', lift.d + ' x ' + lift.w + ' x ' + lift.h]);
+  rows.push(['Door W x H (mm)', door.w + ' x ' + door.h]);
+  rows.push(['Report scope', scopeLabel()]);
+  rows.push(['Exported', new Date().toLocaleString()]);
+  rows.push([]);
+  rows.push(['Row','Item','Unit','L','W','H','Fits','Rotation / placement','Placed D x W x H',
+             'Clearance depth','Clearance width','Clearance height','Notes']);
+  list.forEach(({ it, idx }) => {
+    const unit = unitOf(it);
+    if (it.error){ rows.push([idx, it.name, unit,'','','','NO DATA','','','','','','dimensions missing in source']); return; }
+    const fits = it.known === 3
+      ? (it.status === 'fit' ? 'YES' : it.status === 'rot' ? 'YES (ROTATED)'
+         : it.status === 'door' ? 'CAR YES / DOOR NO' : 'NO')
+      : 'PARTIAL — ' + (it.known === 1 ? it.lineFit.desc : it.rectFit.desc);
+    rows.push([idx, it.name, unit, it.l||'', it.w||'', it.h||'', fits, rotText(it),
+      it.best ? it.best.d + ' x ' + it.best.w + ' x ' + it.best.h : '',
+      it.margin ? it.margin.d : '', it.margin ? it.margin.w : '', it.margin ? it.margin.h : '',
+      it.doorNote || it.diagNote || (it.known < 3 ? 'incomplete dimensions — add missing values for a full check' : '')]);
+  });
+  return rows;
+}
+const csvEsc = CLM_CORE.export.csvEsc;
+function flash(msg){
+  const f = document.getElementById('flash');
+  f.textContent = msg; f.style.opacity = 1;
+  setTimeout(() => f.style.opacity = 0, 2500);
+}
+document.getElementById('csv').onclick = () => {
+  if (!scopeItems().length){ flash('No items in this scope.'); return; }
+  CLM_CORE.export.downloadText('otter-fit-results.csv', CLM_CORE.export.toCSV(buildRows()), 'text/csv;charset=utf-8');
+  flash('CSV downloaded (' + scopeItems().length + ' items).');
+};
+document.getElementById('copy').onclick = () => {
+  if (!scopeItems().length){ flash('No items in this scope.'); return; }
+  const tsv = CLM_CORE.export.toTSV(buildRows());
+  const done = () => flash('Copied — paste into Excel.');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done);
+  else {
+    const t = document.createElement('textarea');
+    t.value = tsv; document.body.appendChild(t); t.select();
+    document.execCommand('copy'); document.body.removeChild(t); done();
+  }
+};
+// ---- compact PDF: one table, small JPEG thumbnails ----
+function captureItem(it){
+  if (!threeOK || it.known < 1) return null;
+  clearItems();
+  buildItemScene(it);
+  const savedPos = camera.position.clone(), savedAspect = camera.aspect, savedRatio = renderer.getPixelRatio();
+  camera.position.set(5600, 4300, 6600);
+  camera.aspect = 1.5; camera.updateProjectionMatrix();
+  camera.lookAt(0, lift.h*0.35, 0);
+  renderer.setPixelRatio(1);
+  renderer.setSize(480, 320, false);
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/jpeg', 0.72);
+  camera.position.copy(savedPos);
+  camera.aspect = savedAspect; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(savedRatio);
+  renderer.setSize(viewport.clientWidth, viewport.clientHeight, false);
+  return url;
+}
+document.getElementById('pdf').onclick = () => {
+  if (!window.jspdf){ flash('PDF library not loaded (internet needed once).'); return; }
+  const list = scopeItems();
+  if (!list.length){ flash('No items in this scope.'); return; }
+  const doc = new window.jspdf.jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const X = { name:9, id:76, dims:106, res:142, img:248 };
+  const W = { name:65, id:28, dims:34, res:104, img:40 };
+  function head(y){
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text('Name', X.name, y); doc.text('ID', X.id, y); doc.text('Dims (mm)', X.dims, y);
+    doc.text('Result', X.res, y); doc.text('Fit view', X.img, y);
+    doc.setFont('helvetica','normal');
+    doc.setDrawColor(120); doc.line(8, y + 1.5, 289, y + 1.5);
+    return y + 1.5;
+  }
+  doc.setFontSize(15); doc.text('Otter Fit — Lift Car Load Report', 9, 12);
+  doc.setFontSize(9);
+  doc.text('Car ' + lift.d + ' x ' + lift.w + ' x ' + lift.h + ' mm   Door ' + door.w + ' x ' + door.h +
+           ' mm   Scope: ' + scopeLabel() + '   ' + new Date().toLocaleString(), 9, 18);
+  let y = head(25) + 3;
+
+  list.forEach(({ it }) => {
+    const nid = nameId(it);
+    const img = captureItem(it);
+    doc.setFontSize(7.5);
+    const nameL = doc.splitTextToSize(nid.name, W.name);
+    const resL = [];
+    resultLines(it).forEach(s => resL.push(...doc.splitTextToSize(s, W.res)));
+    const textH = Math.max(nameL.length, resL.length) * 3.6 + 3;
+    const rowH = Math.max(textH, img ? 29 : 10, 11);
+    if (y + rowH > 200){ doc.addPage(); y = head(15) + 3; }
+    doc.text(nameL, X.name, y + 5);
+    doc.text(nid.id, X.id, y + 5);
+    doc.text(dimStr(it), X.dims, y + 5);
+    doc.text(resL, X.res, y + 5);
+    if (img) doc.addImage(img, 'JPEG', X.img, y + 1, W.img, 26.7);
+    doc.setDrawColor(190); doc.line(8, y + rowH, 289, y + rowH);
+    y += rowH;
+  });
+  doc.save('otter-fit-report.pdf');
+  refresh();
+  flash('PDF downloaded (' + list.length + ' rows).');
+};
+
+// ---------------- CLM/1 suite hand-off ----------------
+let clmProject = '';
+function unitOf(it){
+  return it.name && it.name.indexOf('\uD83D\uDCE6 ') === 0 ? 'container' : 'item';
+}
+function clmResultOf(it){
+  if (it.error) return 'no-data';
+  if (it.known === 1) return 'partial — length only (' + it.lineFit.short + ')';
+  if (it.known === 2) return 'partial — no height (' + it.rectFit.short + ')';
+  return it.status === 'fit' ? 'fit' : it.status === 'rot' ? 'fit-rotated'
+       : it.status === 'door' ? 'car-yes-door-no' : 'no-fit';
+}
+function exportCLM(){
+  const mItems = [], checks = [];
+  items.forEach((it, i) => {
+    const nid = nameId(it);
+    const isUnit = unitOf(it) === 'container';
+    mItems.push({
+      id: nid.id || ('item-' + (i + 1)),
+      name: it.name,
+      unit: isUnit ? 'container' : 'item',
+      dims: { l: it.l || null, w: it.w || null, h: it.h || null },
+      dimsAssumed: false
+    });
+    if (it.error) return;
+    checks.push({
+      item: it.name,
+      unit: isUnit ? 'container' : 'item',
+      against: 'car',
+      result: clmResultOf(it),
+      rotation: it.best ? it.best.short : (it.carBest ? it.carBest.short : ''),
+      crossSection: (it.status === 'door' && it.carBest) ? [it.carBest.w, it.carBest.h] : undefined,
+      doorClearance: it.best ? { w: door.w - it.best.w, h: door.h - it.best.h } : undefined,
+      notes: it.doorNote || it.diagNote || (it.known < 3 ? 'incomplete dimensions' : '')
+    });
+  });
+  const m = CLM.make(
+    clmProject || ('Transport check ' + new Date().toLocaleDateString()),
+    'otter-fit',
+    mItems,
+    [{ id: 'Car', kind: 'vehicle', l: lift.d, w: lift.w, h: lift.h,
+       external: true, door: { w: door.w, h: door.h } }],
+    checks);
+  CLM.download(m, (clmProject || 'otter-fit').replace(/[^\w\-]+/g, '_') + '-manifest.json');
+  CLM.handoff(m);
+  flash('Manifest downloaded.');
+}
+function loadCLMManifest(m){
+  const veh = (m.containers || []).find(c => c && c.kind === 'vehicle');
+  if (veh){
+    lift.d = +veh.l || lift.d; lift.w = +veh.w || lift.w; lift.h = +veh.h || lift.h;
+    if (veh.door){ door.w = +veh.door.w || door.w; door.h = +veh.door.h || door.h; }
+    document.getElementById('ld').value = lift.d;
+    document.getElementById('lw').value = lift.w;
+    document.getElementById('lh').value = lift.h;
+    document.getElementById('dw').value = door.w;
+    document.getElementById('dh').value = door.h;
+    buildLift();
+  }
+
+  // Phase 1: manifests are checked at container level — the crates/boxes
+  // that physically get moved — unless the user also wants the items inside.
+  const units = (m.containers || []).filter(c => c && (c.kind === 'crate' || c.kind === 'box' || c.kind === 'tray')
+    && +c.l > 0 && +c.w > 0 && +c.h > 0);
+  const srcItems = (m.items || []).filter(it => it && it.name && it.dims);
+  const incItems = !!document.getElementById('clm-inc-items').checked;
+
+  let rows = [], note = '';
+  if (units.length && !incItems){
+    rows = units.map(c => ({ name: '\uD83D\uDCE6 ' + c.id, dims: c }));
+    note = srcItems.length
+      ? ` \u2014 checking the ${units.length} container(s) that get moved (tick \u201calso check source items\u201d for the ${srcItems.length} item(s) inside)`
+      : '';
+  } else {
+    rows = units.map(c => ({ name: '\uD83D\uDCE6 ' + c.id, dims: c }))
+      .concat(srcItems.map(it => ({ name: it.name, dims: it.dims })));
+    if (units.length) note = ` \u2014 ${units.length} container(s) + ${srcItems.length} item(s)`;
+  }
+
+  const lines = rows.map(r => {
+    const d = r.dims;
+    return [r.name, d.l, d.w, d.h].filter(v => v !== null && v !== undefined && v !== '').join(',');
+  });
+  if (!lines.length){ flash('Manifest has no usable rows.'); return; }
+  document.getElementById('data').value = lines.join('\n');
+  clmProject = m.project ? String(m.project) : '';
+  goBtn.onclick();
+  flash(`Loaded ${lines.length} row(s) from manifest${note}.`);
+}
+function handleCLMFile(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadCLMManifest(CLM.parse(reader.result)); }
+    catch (err){ flash('Not a valid clm/1 manifest.'); }
+  };
+  reader.readAsText(file);
+}
+
+// ---------------- wiring ----------------
+const goBtn = document.getElementById('go');
+goBtn.onclick = (ev) => {
+  items = parse(document.getElementById('data').value);
+  items.forEach(it => { if (!it.error) checkItem(it); });
+  if (selected < 0 || !items[selected] || items[selected].error)
+    selected = items.findIndex(it => !it.error);
+  refresh();
+  if (ev) document.getElementById('table-wrap').focus(); // real click: hand arrow keys to the list
+};
+const ta = document.getElementById('data');
+let deb;
+ta.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(() => goBtn.onclick(), 350); });
+const bOne = document.getElementById('viewOne'), bAll = document.getElementById('viewAll');
+function syncModeButtons(){
+  bOne.classList.toggle('active', mode === 'one');
+  bAll.classList.toggle('active', mode === 'all');
+}
+bOne.onclick = () => { mode = 'one'; syncModeButtons(); renderTable(); showOne(); };
+bAll.onclick = () => { mode = 'all'; syncModeButtons(); renderTable(); showAll(); };
+['repAll','repFit','repNo'].forEach(id => {
+  document.getElementById(id).onclick = () => {
+    reportScope = id === 'repAll' ? 'all' : id === 'repFit' ? 'fit' : 'no';
+    ['repAll','repFit','repNo'].forEach(j =>
+      document.getElementById(j).classList.toggle('active', j === id));
+    flash('Report scope: ' + scopeLabel());
+  };
+});
+['ld','lw','lh','dw','dh'].forEach(id => {
+  document.getElementById(id).onchange = () => {
+    lift.d = +document.getElementById('ld').value || lift.d;
+    lift.w = +document.getElementById('lw').value || lift.w;
+    lift.h = +document.getElementById('lh').value || lift.h;
+    door.w = +document.getElementById('dw').value || door.w;
+    door.h = +document.getElementById('dh').value || door.h;
+    buildLift();
+    items.forEach(it => { if (!it.error) checkItem(it); });
+    refresh();
+  };
+});
+document.getElementById('clm-out').onclick = exportCLM;
+document.getElementById('clm-in').onclick = () => document.getElementById('clm-file').click();
+document.getElementById('clm-file').onchange = e => {
+  if (e.target.files[0]) handleCLMFile(e.target.files[0]);
+  e.target.value = '';
+};
+CLM.offerBanner('otter-fit', loadCLMManifest);
+
+// vehicle presets from clm-library.js
+const vpSel = document.getElementById('vpreset');
+(window.CLM_LIBRARY && CLM_LIBRARY.vehicles ? CLM_LIBRARY.vehicles : []).forEach((v, i) => {
+  const o = document.createElement('option');
+  o.value = String(i);
+  o.textContent = `${v.name} \u2014 ${v.d} \u00d7 ${v.w} \u00d7 ${v.h} \u00b7 door ${v.doorW} \u00d7 ${v.doorH}`;
+  vpSel.appendChild(o);
+});
+vpSel.onchange = () => {
+  const v = (window.CLM_LIBRARY && CLM_LIBRARY.vehicles ? CLM_LIBRARY.vehicles : [])[+vpSel.value];
+  if (!v) return;
+  document.getElementById('ld').value = v.d;
+  document.getElementById('lw').value = v.w;
+  document.getElementById('lh').value = v.h;
+  document.getElementById('dw').value = v.doorW;
+  document.getElementById('dh').value = v.doorH;
+  document.getElementById('ld').onchange();
+  vpSel.selectedIndex = 0;
+};
+
+document.getElementById('sample').onclick = () => {
+  ta.value =
+`Landau carriage(id1),3810,1730,2110
+Cobb and Co Coach(id2),3800,2100,2900
+Hansom Cab(id3),2400
+Whale boat(id4),9850,1665,1140`;
+  goBtn.onclick();
+};
+if (threeOK){ resize(); buildLift(); (function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})(); }
+</script>
+</body>
+</html>
