@@ -625,10 +625,12 @@ function consolidate(trays, cfg) {
     }
 
 function crateHeight(trays, allow) {
+        // config panels name the interlayer allowance "inter"; accept both
+        const interlayer = Number(allow.interlayer != null ? allow.interlayer : allow.inter) || 0;
         let h = allow.base + allow.top;
 
         trays.forEach((t, i) => {
-            if (i > 0) h += allow.interlayer;
+            if (i > 0) h += interlayer;
             h += t.extD; // Use external depth (internal + base + lid)
         });
 
@@ -1486,7 +1488,7 @@ window.CLM_LIBRARY = {
         <div class="flex items-center gap-4">
             <span id="status-bar" class="text-xs text-muted font-sans tracking-wide">Ready</span>
 
-            <a href="suite.html" title="Back to the Collection Logistics Suite" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
+            <a href="index.html" title="Back to the Collection Logistics Suite" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
                 </svg>
@@ -4383,7 +4385,7 @@ for (const it of S.result.unpacked) {
         const m = CLM.make(CLM_PROJECT, 'capackybara', items, containers, []);
         CLM.download(m, String(CLM_PROJECT).replace(/[^\w\-]+/g, '_') + '-manifest.json');
         CLM.handoff(m);
-        alertMsg('Manifest downloaded \u2014 open it in Stick it on a Shelf ("Load Manifest") or inspect it in suite.html.', 'success');
+        alertMsg('Manifest downloaded \u2014 open it in Stick it on a Shelf ("Load Manifest") or inspect it in index.html.', 'success');
     }
 
     function loadCLMManifest(m) {

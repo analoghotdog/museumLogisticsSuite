@@ -1,0 +1,16 @@
+# Collection data & object images — NEVER commit these.
+# They can contain sensitive collection information; keep them on local machines only.
+*_Media/
+*.tsv
+*.csv
+*-manifest.json
+*.xlsx
+*.xls
+
+# Generated standalone copies (rebuild with `node build.js`)
+dist/
+
+# Tooling / OS noise
+.openclaw/
+.DS_Store
+node_modules/

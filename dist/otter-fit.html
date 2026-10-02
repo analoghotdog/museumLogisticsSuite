@@ -81,7 +81,7 @@
     &nbsp; Door (mm): W <input id="dw" type="number" value="1800" step="10">
     H <input id="dh" type="number" value="2400" step="10">
   </div>
-  <a class="suite-link" href="suite.html" title="Back to the Collection Logistics Suite">Back to Hub</a>
+  <a class="suite-link" href="index.html" title="Back to the Collection Logistics Suite">Back to Hub</a>
 </header>
 <main>
 <aside>
@@ -720,10 +720,12 @@ function consolidate(trays, cfg) {
     }
 
 function crateHeight(trays, allow) {
+        // config panels name the interlayer allowance "inter"; accept both
+        const interlayer = Number(allow.interlayer != null ? allow.interlayer : allow.inter) || 0;
         let h = allow.base + allow.top;
 
         trays.forEach((t, i) => {
-            if (i > 0) h += allow.interlayer;
+            if (i > 0) h += interlayer;
             h += t.extD; // Use external depth (internal + base + lid)
         });
 

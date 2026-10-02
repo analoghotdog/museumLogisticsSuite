@@ -587,10 +587,12 @@ function consolidate(trays, cfg) {
     }
 
 function crateHeight(trays, allow) {
+        // config panels name the interlayer allowance "inter"; accept both
+        const interlayer = Number(allow.interlayer != null ? allow.interlayer : allow.inter) || 0;
         let h = allow.base + allow.top;
 
         trays.forEach((t, i) => {
-            if (i > 0) h += allow.interlayer;
+            if (i > 0) h += interlayer;
             h += t.extD; // Use external depth (internal + base + lid)
         });
 

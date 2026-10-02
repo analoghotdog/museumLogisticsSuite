@@ -10,7 +10,7 @@ if (core.includes('</script') || lib.includes('</script')) {
   process.exit(1);
 }
 fs.mkdirSync(path.join(DIR, 'dist'), { recursive: true });
-const apps = ['suite.html', 'capackybara.html', 'stick-it-on-a-shelf.html', 'otter-fit.html'];
+const apps = ['index.html', 'capackybara.html', 'stick-it-on-a-shelf.html', 'otter-fit.html'];
 for (const f of apps) {
   let s = fs.readFileSync(path.join(DIR, f), 'utf8');
   const before = s;

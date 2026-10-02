@@ -115,7 +115,7 @@
             inset: 0;
             pointer-events: none;
             z-index: 9999;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' n[...]
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.015'/%3E%3C/svg%3E");
             opacity: .6;
         }
 
@@ -521,28 +521,10 @@
                 page-break-after: auto;
             }
 
-            .print-tray-diagram-page {
-                break-after: page;
-                page-break-after: always;
-                padding: 0;
-                margin: 0;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-            }
-
-            .print-tray-items-page {
-                break-after: page;
-                page-break-after: always;
-                padding: 8mm;
-            }
-
-            .print-tray-items-page:last-child {
-                break-after: auto;
-                page-break-after: auto;
-            }
+            .print-tray-block { border: none; padding: 0; margin: 0; }
+        .print-tray-block .tray-title { font-size: 13px; }
+        .print-tray-block .tray-sub { font-size: 8px; }
+        .print-tray-block .tray-diagram-wrap { display: block; }
 
             .tray-item, .tray-num, .legend-num, .legend-thumb, .tray-diagram {
                 -webkit-print-color-adjust: exact;
@@ -576,14 +558,14 @@
         <div class="flex items-center gap-4">
             <span id="status-bar" class="text-xs text-muted font-sans tracking-wide">Ready</span>
 
-            <a href="suite.html" title="Back to the Collection Logistics Suite" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest fon[...]
+            <a href="index.html" title="Back to the Collection Logistics Suite" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
                 </svg>
                 Back to Hub
             </a>
 
-            <button id="btn-open-help" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-su[...]
+            <button id="btn-open-help" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <circle cx="12" cy="12" r="10"/>
                     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
@@ -608,7 +590,7 @@
                 </div>
                 <div class="flex gap-3 mb-3">
                     <input type="file" id="media-folder" webkitdirectory directory multiple class="hidden">
-                    <button id="btn-media-folder" class="btn-sec flex-1" title="Load object images from a local folder. They stay in your browser — nothing is uploaded.">Images Folder (local)</[...]
+                    <button id="btn-media-folder" class="btn-sec flex-1" title="Load object images from a local folder. They stay in your browser — nothing is uploaded.">Images Folder (local)</button>
                 </div>
                 <div class="flex gap-3 mb-3">
                     <input type="file" id="clm-file" accept=".json,application/json" class="hidden">
@@ -933,17 +915,12 @@
         </section>
     </main>
 
-    <!-- PRINT ROOT FOR PDF EXPORT -->
-    <div id="print-root">
-        <div id="print-content"></div>
-    </div>
-
     <!-- HELP MODAL -->
     <div id="help-modal" class="fixed inset-0 z-[10000] hidden">
         <div id="help-backdrop" class="absolute inset-0 bg-ink/40 backdrop-blur-sm transition-opacity duration-300 opacity-0"></div>
 
         <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-            <div id="help-panel" class="pointer-events-auto w-full max-w-2xl max-h-[85vh] bg-surface border border-bdr rounded-xl shadow-2xl flex flex-col transform transition-all duration-300 sc[...]
+            <div id="help-panel" class="pointer-events-auto w-full max-w-2xl max-h-[85vh] bg-surface border border-bdr rounded-xl shadow-2xl flex flex-col transform transition-all duration-300 scale-95 opacity-0 overflow-hidden">
 
                 <div class="flex items-center justify-between px-8 py-6 border-b border-bdr bg-base">
                     <div>
@@ -973,7 +950,7 @@
                         <ul class="space-y-2 list-disc pl-5 marker:text-accent">
                             <li>
                                 <strong>Museum TSV export:</strong>
-                                Columns are <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">Object short summary &middot; Nomenclature Classification Category &middot; [...]
+                                Columns are <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">Object short summary &middot; Nomenclature Classification Category &middot; Dimensions LWH comma separate &middot; Image Ref - Relative path</code>.
                             </li>
                             <li>
                                 <strong>Plain CSV:</strong>
@@ -981,7 +958,7 @@
                             </li>
                             <li>
                                 <strong>Image refs:</strong>
-                                Images sit in a folder named after your import file, extension included, with <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">_Media</co[...]
+                                Images sit in a folder named after your import file, extension included, with <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">_Media</code> on the end. Each ref is read as a path inside it. So <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt_Media/</code> and <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv_Media/</code>. Two ways to supply it: drop the folder next to this HTML file (rename the import file and the folder has to follow), or use <strong>Images Folder (local)</strong> to pick any folder on your machine — matched by relative path first, then file name. Picked images stay in your browser and are never uploaded.
                             </li>
                             <li>
                                 <strong>Missing dimensions:</strong>
@@ -1021,121 +998,2570 @@
                             <li><strong>Padded L &times; W:</strong> The two longest dimensions, laid flat, plus (2 &times; Side Padding).</li>
                             <li><strong>Padded H:</strong> The shortest dimension, standing vertically, plus Depth Pad and Lid Clearance.</li>
                             <li><strong>Depth Pad:</strong> Extra foam or base material under the object.</li>
-                            <li><strong>Lid Clearance:</strong> Gap to the lid of the tray, keeps pressure off the item.</li>
+                            <li><strong>Lid Clearance:</strong> Headspace above the object so the lid closes without touching it.</li>
                         </ul>
                     </section>
 
                     <section>
                         <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            3. Type Height Defaults
+                            3. Tray Configuration
                         </h3>
 
                         <p class="mb-4 text-muted">
-                            If a row has no height, CaPackyBara guesses it based on the object type. Adjust the defaults, or add new types.
+                            Objects are packed into standard trays first. The trays are the modular units that stack inside the crates.
                         </p>
 
                         <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li>The <strong>Fallback</strong> is the height for any type not in the list.</li>
-                            <li>Types are case-insensitive and trimmed.</li>
+                            <li>
+                                <strong>Standard Tray Depths:</strong>
+                                Set in fixed increments, for example 50 and 100 mm. Each padded height rounds up to the next valid depth.
+                            </li>
+                            <li>
+                                <strong>Tray Footprints:</strong>
+                                The L &times; W base sizes on offer. The packer picks the smallest footprint that fits the grouped objects.
+                            </li>
+                            <li>
+                                <strong>Grouping:</strong>
+                                Objects are batched either by Type and Depth, or by Depth alone, before packing.
+                            </li>
                         </ul>
                     </section>
 
                     <section>
                         <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            4. Tray Inventory & Depths
+                            4. External Crate Allowances
                         </h3>
 
                         <p class="mb-4 text-muted">
-                            Tell CaPackyBara which tray depths (internal heights) are in stock and how many of each.
+                            These are the structural dimensions added outside the tray footprint to arrive at the final crate size.
                         </p>
 
+                        <div class="bg-base p-5 rounded-lg border border-bdr/50 font-mono text-xs text-muted mb-4">
+                            Final Crate Width = Tray Width + (2 &times; Side Walls)<br>
+                            Final Crate Length = Tray Length + (2 &times; Side Walls)<br>
+                            Final Crate Height = Base Board + Top Clearance + &Sigma;(Tray Depths + Interlayers)
+                        </div>
+
                         <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li><strong>Format:</strong> <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">50:3, 100:4, 150:2, 200</code></li>
-                            <li><strong>50:3</strong> → 3 trays of 50 mm depth</li>
-                            <li><strong>200</strong> → unlimited trays of 200 mm depth (no count = infinite)</li>
-                            <li>Leave blank to permit CaPackyBara to custom-size trays as needed.</li>
+                            <li><strong>Side Walls:</strong> Wall thickness on all four vertical sides.</li>
+                            <li><strong>Base Board:</strong> Thickness of the bottom pallet or base structure.</li>
+                            <li><strong>Top Clearance:</strong> Space or lid thickness at the top of the crate.</li>
+                            <li><strong>Interlayer:</strong> Divider thickness between trays stacked in the same crate.</li>
                         </ul>
                     </section>
 
                     <section>
                         <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            5. Tray Footprints
+                            5. Consolidation &amp; Limits
                         </h3>
 
-                        <p class="mb-4 text-muted">
-                            The internal L &times; W of each tray style you have available. CaPackyBara will pack objects into these, stacking depth.
-                        </p>
-
                         <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li><strong>ClipCrate:</strong> 895 &times; 790 mm is the standard.</li>
-                            <li>Add more sizes if you use different trays or have custom footprints.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            6. Structural Thickness & Crate Allowances
-                        </h3>
-
-                        <p class="mb-4 text-muted">
-                            These build the external dimensions of each tray and crate from the item placements.
-                        </p>
-
-                        <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li><strong>Tray side walls:</strong> Material thickness on the tray perimeter (usually 18 mm).</li>
-                            <li><strong>Tray base:</strong> Bottom support (usually 18 mm).</li>
-                            <li><strong>Tray lid:</strong> Lid thickness if trays have lids (0 if open-top).</li>
-                            <li><strong>Crate side walls:</strong> Spacing for crate walls around the packed trays.</li>
-                            <li><strong>Crate base board:</strong> Heavy timber or platform under the crate (usually 150 mm).</li>
-                            <li><strong>Crate interlayer:</strong> Cardboard or plywood between stacked trays inside a crate.</li>
-                            <li><strong>Crate top clearance:</strong> Space for lid or tie-down (usually 18 mm).</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            7. Consolidation Rules
-                        </h3>
-
-                        <p class="mb-4 text-muted">
-                            After packing, trays with low utilization can be merged to reduce waste.
-                        </p>
-
-                        <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li><strong>Min util. before merge:</strong> If a tray is below this %, it becomes a candidate for merging.</li>
-                            <li><strong>Cross-type fill:</strong> Allows objects of different types to be packed together in the same tray.</li>
-                            <li><strong>Max depth variance:</strong> Trays being merged must have depths within this range (in mm).</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h3 class="font-display text-lg text-accent mb-3 border-b border-bdr/50 pb-2">
-                            8. Reading the Results
-                        </h3>
-
-                        <p class="mb-4 text-muted">
-                            After you <strong>Run CaPackyBara</strong>:
-                        </p>
-
-                        <ul class="space-y-2 list-disc pl-5 marker:text-accent">
-                            <li><strong>3D Visualization:</strong> Rotate, zoom, pan to inspect the load.</li>
-                            <li><strong>Results Table:</strong> A row per item, showing which crate, tray, and position it occupies.</li>
-                            <li><strong>Tray Layouts:</strong> Top-down diagrams of each tray. Drag items to rearrange, double-click to rotate.</li>
-                            <li><strong>Export Trays as PDF:</strong> Print-friendly pages: one tray diagram per page, followed by an items list for that tray.</li>
+                            <li>
+                                <strong>Min Utilization:</strong>
+                                The fill percentage a tray must reach before the system tries merging it with another partly filled tray.
+                            </li>
+                            <li>
+                                <strong>Cross-type Fill:</strong>
+                                When on, different object types may share a tray during consolidation.
+                            </li>
+                            <li>
+                                <strong>Max Crate Dimensions:</strong>
+                                Hard physical limits. A stack that exceeds them splits into multiple crates. Set to 0 for no limit, though your loading dock may disagree.
+                            </li>
+                            <li>
+                                <strong>Oversized Handling:</strong>
+                                Anything that fits no standard tray footprint gets its own custom crate.
+                            </li>
                         </ul>
                     </section>
 
                 </div>
 
-                <div class="px-8 py-4 bg-base border-t border-bdr flex gap-3 justify-end">
-                    <button id="btn-close-help-footer" class="btn-sec">Close</button>
+                <div class="px-8 py-4 border-t border-bdr bg-base text-center">
+                    <p class="text-[0.65rem] text-muted uppercase tracking-widest">
+                        CaPackyBara v4 &middot; Balancing Arranger
+                    </p>
                 </div>
 
             </div>
         </div>
     </div>
 
-    <script src="capackybara-app.js"></script>
+    <div id="print-root" aria-hidden="true"></div>
+    <div id="tooltip"></div>
+    <div id="alerts" class="fixed top-20 right-6 z-[9998] space-y-3 max-w-sm"></div>
 
+    <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* ================================================================
+       DYNAMIC TYPE COLOUR SYSTEM
+    ================================================================ */
+    const KNOWN_TYPE_HEX = {
+        'pendant':  0xD4B895,
+        'hei tiki': 0x6B705C,
+        'hei-tiki': 0x6B705C,
+        'heitiki':  0x6B705C,
+        'tool':     0x8C735A,
+        'adze':     0x8C735A,
+        'chisel':   0x8C735A,
+        'mere':     0x5C5248,
+        'boulder':  0x7A8B88,
+        'modern':   0x9CA3A0,
+        'raw':      0xA87C65,
+    };
+
+    const KNOWN_HEIGHT_DEFAULTS = {
+        'pendant': 15,
+        'hei tiki': 20,
+        'hei-tiki': 20,
+        'heitiki': 20,
+        'tool': 50,
+        'adze': 50,
+        'chisel': 50,
+        'mere': 60,
+        'boulder': 150,
+        'modern': 45,
+        'raw': 100,
+    };
+
+    const EXTRA_PALETTE = [
+        0x8A9A5B, 0xC19A6B, 0x70828F, 0xA67B5B, 0x9C8168,
+        0x656D62, 0xB5838D, 0x6D6875, 0xE5989B, 0xFFB4A2,
+        0x8D6E63, 0x4A5759, 0xCDB4DB, 0xA8DADC, 0xF4A261,
+        0xE76F51, 0x2A9D8F, 0xE9C46A,
+    ];
+
+    const SAMPLE = [
+        { name:"Pendant A1",  type:"Pendant",  length_mm:80,  width_mm:60,  height_mm:15 },
+        { name:"Pendant A2",  type:"Pendant",  length_mm:90,  width_mm:70,  height_mm:12 },
+        { name:"Pendant A3",  type:"Pendant",  length_mm:75,  width_mm:55,  height_mm:18 },
+        { name:"Pendant A4",  type:"Pendant",  length_mm:85,  width_mm:65,  height_mm:14 },
+        { name:"Pendant A5",  type:"Pendant",  length_mm:100, width_mm:80,  height_mm:16 },
+        { name:"Pendant A6",  type:"Pendant",  length_mm:70,  width_mm:50,  height_mm:13 },
+        { name:"Hei Tiki B1", type:"Hei tiki", length_mm:120, width_mm:80,  height_mm:20 },
+        { name:"Hei Tiki B2", type:"Hei tiki", length_mm:110, width_mm:75,  height_mm:22 },
+        { name:"Hei Tiki B3", type:"Hei tiki", length_mm:130, width_mm:85,  height_mm:18 },
+        { name:"Adze C1",     type:"Tool",     length_mm:350, width_mm:100, height_mm:50 },
+        { name:"Adze C2",     type:"Tool",     length_mm:300, width_mm:90,  height_mm:45 },
+        { name:"Chisel C3",   type:"Tool",     length_mm:250, width_mm:60,  height_mm:35 },
+        { name:"Mere D1",     type:"Mere",     length_mm:400, width_mm:80,  height_mm:60 },
+        { name:"Mere D2",     type:"Mere",     length_mm:380, width_mm:75,  height_mm:55 },
+        { name:"Mere D3",     type:"Mere",     length_mm:420, width_mm:85,  height_mm:65 },
+        { name:"Boulder E1",  type:"Boulder",  length_mm:250, width_mm:200, height_mm:150 },
+        { name:"Boulder E2",  type:"Boulder",  length_mm:300, width_mm:220, height_mm:140 },
+        { name:"Modern F1",   type:"Modern",   length_mm:200, width_mm:150, height_mm:45 },
+        { name:"Modern F2",   type:"Modern",   length_mm:180, width_mm:120, height_mm:40 },
+        { name:"Modern F3",   type:"Modern",   length_mm:220, width_mm:160, height_mm:50 },
+        { name:"Raw G1",      type:"Raw",      length_mm:300, width_mm:250, height_mm:100 },
+        { name:"Raw G2",      type:"Raw",      length_mm:280, width_mm:200, height_mm:110 },
+    ];
+
+    const DEFAULT_FP = [
+        { label:'ClipCrate', l:895, w:790 },
+
+    ];
+
+    /* ================================================================
+       STATE
+    ================================================================ */
+    let CLM_PROJECT = 'CaPackyBara export';
+
+    const S = {
+        raw: [],
+        result: null,
+        scene: null,
+        cam: null,
+        ren: null,
+        ctrl: null,
+        ray: new THREE.Raycaster(),
+        mouse: new THREE.Vector2(-9, -9),
+        meshes: [],
+        hovered: null,
+        heightDefaults: {},
+        colorMap: {},
+    };
+
+    /* ================================================================
+       HELPERS
+    ================================================================ */
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function v(id) {
+        const el = $(id);
+        return el ? parseFloat(el.value) || 0 : 0;
+    }
+
+    function alertMsg(msg, type = 'info') {
+        const c = $('alerts');
+        const d = document.createElement('div');
+
+        const bg = {
+            info: 'bg-surface-2 border-bdr text-ink',
+            success: 'bg-matcha/10 border-matcha/40 text-matcha',
+            warning: 'bg-clay/10 border-clay/40 text-clay',
+            error: 'bg-[#A35D47]/10 border-[#A35D47]/40 text-[#A35D47]'
+        };
+
+        d.className = `alert-enter ${bg[type] || bg.info} border px-5 py-3.5 rounded-lg text-xs font-sans shadow-sm backdrop-blur`;
+        d.textContent = msg;
+        c.appendChild(d);
+
+        setTimeout(() => {
+            d.style.opacity = '0';
+            d.style.transition = 'opacity .4s';
+            setTimeout(() => d.remove(), 400);
+        }, 4500);
+    }
+
+    function setStatus(t) {
+        const el = document.getElementById('status-bar');
+        if (el) el.textContent = t;
+    }
+
+    function normType(t) {
+        if (!t || !String(t).trim()) return 'Unknown';
+        return String(t).trim();
+    }
+
+    /* ================================================================
+       TYPE + COLOUR MANAGEMENT
+    ================================================================ */
+    function discoverTypes() {
+        return [...new Set(S.raw.map(i => i.type))].sort();
+    }
+
+    function buildColorMap(types) {
+        const map = {};
+        const used = new Set();
+
+        for (const t of types) {
+            const key = t.toLowerCase();
+            if (KNOWN_TYPE_HEX[key]) {
+                map[t] = {
+                    hex: KNOWN_TYPE_HEX[key],
+                    css: '#' + KNOWN_TYPE_HEX[key].toString(16).padStart(6, '0')
+                };
+                used.add(KNOWN_TYPE_HEX[key]);
+            }
+        }
+
+        let ei = 0;
+        for (const t of types) {
+            if (map[t]) continue;
+
+            while (ei < EXTRA_PALETTE.length && used.has(EXTRA_PALETTE[ei])) ei++;
+
+            const col = ei < EXTRA_PALETTE.length ? EXTRA_PALETTE[ei++] : 0x888888;
+            map[t] = {
+                hex: col,
+                css: '#' + col.toString(16).padStart(6, '0')
+            };
+            used.add(col);
+        }
+
+        return map;
+    }
+
+    function refreshHeightDefaults() {
+        const types = discoverTypes();
+        const fallback = v('fallback-height') || 50;
+
+        for (const t of types) {
+            if (S.heightDefaults[t] === undefined) {
+                S.heightDefaults[t] = KNOWN_HEIGHT_DEFAULTS[t.toLowerCase()] || fallback;
+            }
+        }
+
+        rebuildHeightDefaultsUI();
+    }
+
+    function rebuildHeightDefaultsUI() {
+        const box = $('height-defaults');
+        const entries = Object.entries(S.heightDefaults).sort((a, b) => a[0].localeCompare(b[0]));
+
+        if (!entries.length) {
+            box.innerHTML = '<p class="text-xs text-muted italic">Load data to discover types.</p>';
+            return;
+        }
+
+        box.innerHTML = '';
+
+        for (const [type, height] of entries) {
+            const d = document.createElement('div');
+            d.innerHTML = `
+                <label class="input-label">${type}</label>
+                <input type="number" data-type="${type}" class="hd-input" value="${height}" min="0">
+            `;
+            box.appendChild(d);
+        }
+    }
+
+    function getActiveHeightDefaults() {
+        const map = {};
+        document.querySelectorAll('.hd-input').forEach(inp => {
+            map[inp.dataset.type] = parseFloat(inp.value) || 50;
+        });
+        return map;
+    }
+
+    /* ================================================================
+       CONFIG
+    ================================================================ */
+   function parseTrayInventory(inputStr) {
+        return CLM_CORE.cratepack.parseTrayInventory(inputStr);
+    }
+    function getConfig() {
+        const padStr = document.querySelector('input[name="pad-strategy"]:checked').value;
+
+        const { inventory: trayInventory, hasLimits } = parseTrayInventory($('tray-depths').value);
+const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
+
+        const fps = [];
+        document.querySelectorAll('.fp-row').forEach(r => {
+            const l = parseInt(r.querySelector('.fp-l').value);
+            const w = parseInt(r.querySelector('.fp-w').value);
+            if (l > 0 && w > 0) {
+                fps.push({
+                    label: r.querySelector('.fp-lbl').value || 'Custom',
+                    l,
+                    w
+                });
+            }
+        });
+
+        fps.sort((a, b) => a.l * a.w - b.l * b.w);
+
+        const ovrEl = $('create-ovr-crates');
+
+        return {
+            padStrategy: padStr,
+            minPad: v('min-pad'),
+            padFactor: v('pad-factor'),
+            maxPad: v('max-pad'),
+            flatPad: v('flat-pad'),
+            depthPad: v('depth-pad'),
+            lidClearance: v('lid-clearance'),
+            missingDim: v('missing-dim') || 50,
+            trayDepths: depths,
+            trayInventory: trayInventory, 
+            hasTrayLimits: hasLimits,     
+            heightDefaults: getActiveHeightDefaults(),
+            fallbackHeight: v('fallback-height') || 50,
+            grouping: $('grouping-strategy').value,
+            minUtil: v('min-util'),
+            crossType: $('cross-type').value === 'yes',
+            maxDepthVar: v('max-depth-var'),
+            footprints: fps,
+            maxCrate: {
+                l: v('max-crate-l'),
+                w: v('max-crate-w'),
+                h: v('max-crate-h')
+            },
+            allow: {
+                sides: v('allow-sides'),
+                interlayer: v('allow-inter'),
+                base: v('allow-base'),
+                top: v('allow-top')
+            },
+            trayStruct: {
+                sideWall: v('tray-side-wall'),
+                base: v('tray-base'),
+                lid: v('tray-lid')
+            },
+            createOvrCrates: ovrEl ? ovrEl.checked : true
+        };
+    }
+
+    /* ================================================================
+       FOOTPRINT UI
+    ================================================================ */
+    function addFpRow(lbl = '', l = '', w = '') {
+        const d = document.createElement('div');
+        d.className = 'fp-row';
+
+        d.innerHTML = `
+            <input class="fp-lbl flex-shrink-0" style="width:80px" value="${lbl}" placeholder="Label">
+            <input type="number" class="fp-l flex-shrink-0" style="width:80px" value="${l}" placeholder="L mm" min="0">
+            <span class="text-muted text-xs">&times;</span>
+            <input type="number" class="fp-w flex-shrink-0" style="width:80px" value="${w}" placeholder="W mm" min="0">
+            <button class="text-clay/60 hover:text-clay text-lg leading-none ml-2">&times;</button>
+        `;
+
+        d.querySelector('button').onclick = () => d.remove();
+        $('fp-list').appendChild(d);
+    }
+
+    function initFps() {
+        DEFAULT_FP.forEach(f => addFpRow(f.label, f.l, f.w));
+    }
+
+    /* ================================================================
+       FILE HANDLING
+    ================================================================ */
+    /* ================================================================
+       FILE HANDLING (CSV + museum TSV, UTF-8 / UTF-16)
+    ================================================================ */
+    function decodeUploadBuffer(buf) {
+        const bytes = new Uint8Array(buf);
+
+        if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+            return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+        }
+
+        if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+            return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+        }
+
+        let zeros = 0;
+        let n = 0;
+
+        for (let i = 0; i + 1 < Math.min(bytes.length, 400); i += 2, n++) {
+            if (bytes[i] === 0 && bytes[i + 1] !== 0) zeros++;
+        }
+
+        if (n > 10 && zeros / n > 0.3) {
+            return new TextDecoder('utf-16le').decode(bytes);
+        }
+
+        return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    function numOrNull(x) {
+        return CLM_CORE.dims.numOrNull(x);
+    }
+
+    function parseDimsCell(s) {
+        return CLM_CORE.dims.parseDimsCell(s);
+    }
+
+    // Images live in a folder named after the import file (extension included)
+    // plus "_Media", next to this HTML file: foo.tsv -> foo.tsv_Media/
+    function mediaFolder(srcName) {
+        return String(srcName || '').trim() + '_Media';
+    }
+
+    function imgPath(p, folder) {
+        if (!p || !folder) return '';
+
+        let s = String(p)
+            .trim()
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '');
+
+        if (!s) return '';
+        if (s.toLowerCase().indexOf(folder.toLowerCase() + '/') !== 0) s = folder + '/' + s;
+
+        return encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F');
+    }
+
+    // Fallback chain if the primary <file>_Media/<ref> path 404s.
+    let MEDIA_FOLDER = '';
+
+    // ---- Local images folder (stays on the user's machine; never uploaded) ----
+    // "Images Folder (local)" lets the user pick an image folder from disk — e.g.
+    // when the tools are hosted on GitHub Pages but the collection data must not
+    // be published. Files become in-browser object URLs, matched against image
+    // refs by relative path first, then file name. Path-based loading next to
+    // this HTML file keeps working and is used only when no local match exists.
+    const LOCAL_MEDIA = new Map();   // lowercased key -> object URL
+    const LOCAL_MEDIA_URLS = new Set();
+    const LOCAL_MEDIA_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i;
+
+    function ingestMediaFolder(fileList) {
+        LOCAL_MEDIA_URLS.forEach(u => URL.revokeObjectURL(u));
+        LOCAL_MEDIA_URLS.clear();
+        LOCAL_MEDIA.clear();
+
+        Array.from(fileList || []).forEach(f => {
+            if (!LOCAL_MEDIA_EXT.test(f.name)) return;
+
+            const url = URL.createObjectURL(f);
+            LOCAL_MEDIA_URLS.add(url);
+
+            const rel = (f.webkitRelativePath || f.name).replace(/\\/g, '/').replace(/^\/+/, '');
+            const parts = rel.split('/');
+            const noTop = parts.length > 1 ? parts.slice(1).join('/') : rel;
+
+            [rel, noTop, parts[parts.length - 1], noTop.split('/').pop()].forEach(k => {
+                const key = String(k || '').trim().toLowerCase();
+                if (key && !LOCAL_MEDIA.has(key)) LOCAL_MEDIA.set(key, url);
+            });
+        });
+
+        return LOCAL_MEDIA.size;
+    }
+
+    function localSrc(candidates) {
+        for (const c of candidates) {
+            let s = String(c || '').replace(/\\/g, '/').replace(/^\/+/, '');
+            if (!s) continue;
+
+            try { s = decodeURIComponent(s); } catch (e) { s = decodeURI(s); }
+
+            const key = s.toLowerCase();
+            const hit = LOCAL_MEDIA.get(key) || LOCAL_MEDIA.get(key.split('/').pop());
+            if (hit) return hit;
+        }
+
+        return '';
+    }
+
+    function imgCandidates(primary) {
+        const list = [primary];
+        if (!primary || !MEDIA_FOLDER) return list;
+
+        const pre = encodeURI(MEDIA_FOLDER) + '/';
+        const rel = primary.indexOf(pre) === 0 ? primary.slice(pre.length) : primary;
+        const base = rel.split('/').pop();
+
+        [rel, 'images/' + rel, pre + base, 'images/' + base].forEach(c => {
+            if (c && list.indexOf(c) === -1) list.push(c);
+        });
+
+        return list;
+    }
+
+    function setImgSrc(im, primary, onFail) {
+        const list = imgCandidates(primary);
+
+        const local = localSrc(list);
+        if (local) {
+            im.src = local;
+            return;
+        }
+
+        let i = 0;
+
+        im.onerror = () => {
+            i++;
+            if (i < list.length) im.src = list[i];
+            else onFail();
+        };
+
+        im.src = list[0];
+    }
+
+    // Probe the first image after a load so a wrong folder name is reported, not silent.
+    function probeImages() {
+        const first = S.raw.find(i => i.img);
+        if (!first) return;
+
+        const list = imgCandidates(first.img);
+        if (localSrc(list)) return;   // local folder already covers it
+
+        let i = 0;
+        const probe = new Image();
+
+        probe.onload = () => {};
+        probe.onerror = () => {
+            i++;
+            if (i < list.length) { probe.src = list[i]; return; }
+            alertMsg('Images not found. Expected: ' + decodeURI(list[0])
+                + ' (next to this HTML file) \u2014 or pick the folder on your machine with "Images Folder (local)"', 'warning');
+        };
+        probe.src = list[0];
+    }
+
+    function cleanSummary(raw) {
+        let s = String(raw || '')
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+            .replace(/\uFEFF/g, '')
+            .trim();
+
+        const keyPos = s.search(/\b(Acc|Name|Cat|Maker|Hazard|Restricted|Subj)\s*:/i);
+
+        if (keyPos > 0) {
+            s = s.slice(keyPos);
+        } else {
+            s = s.replace(/^[^A-Za-z0-9]+/, '');
+        }
+
+        s = s.replace(/\s+/g, ' ').trim();
+
+        const nm = s.match(/Name:\s*([^;]+)/i);
+        const acc = s.match(/Acc:\s*([^;]+)/i);
+        const cat = s.match(/Cat:\s*([^;]+)/i);
+
+        let display;
+
+        if (nm) {
+            display = nm[1].trim();
+            const tags = [];
+            if (acc) tags.push('Acc ' + acc[1].trim());
+            if (cat) tags.push('Cat ' + cat[1].trim());
+            if (tags.length) display += ' \u2014 ' + tags.join(', ');
+        } else {
+            display = s.split(';').slice(0, 2).join('; ').trim() || s;
+        }
+
+        return {
+            display,
+            cleaned: s,
+            acc: acc ? acc[1].trim() : '',
+            cat: cat ? cat[1].trim() : ''
+        };
+    }
+
+    function ingestRows(rows, cols, srcName) {
+        const folder = mediaFolder(srcName);
+        MEDIA_FOLDER = folder;
+        const isMuseum = cols.includes('Object short summary')
+            || cols.includes('Dimensions LWH comma separate')
+            || cols.includes('Image Ref - Relative path');
+
+        if (isMuseum) {
+            S.raw = rows
+                .filter(row => row['Object short summary'])
+                .map(row => {
+                    const summary = String(row['Object short summary'] || '');
+                    const info = cleanSummary(summary);
+                    const [l, w, h] = parseDimsCell(row['Dimensions LWH comma separate']);
+
+                    return {
+                        name: info.display,
+                        summary: info.cleaned,
+                        acc: info.acc,
+                        cat: info.cat,
+                        type: normType(row['Nomenclature Classification Category'] || ''),
+                        length_mm: l,
+                        width_mm: w,
+                        height_mm: h,
+                        img: imgPath(row['Image Ref - Relative path'] || '', folder)
+                    };
+                });
+        } else {
+            const need = ['name', 'type', 'length_mm', 'width_mm', 'height_mm'];
+            const miss = need.filter(c => !cols.includes(c));
+
+            if (miss.length) {
+                alertMsg('Missing columns: ' + miss.join(', '), 'error');
+                return;
+            }
+
+            S.raw = rows
+                .filter(row => row.name && row.type)
+                .map(row => {
+                    const nm = String(row.name).trim();
+
+                    return {
+                        name: nm,
+                        summary: nm,
+                        type: normType(row.type),
+                        length_mm: numOrNull(row.length_mm),
+                        width_mm: numOrNull(row.width_mm),
+                        height_mm: numOrNull(row.height_mm),
+                        img: imgPath(row.image || row['Image Ref - Relative path'] || '', folder)
+                    };
+                });
+        }
+
+        if (!S.raw.length) {
+            alertMsg('No usable rows found in ' + srcName, 'warning');
+            return;
+        }
+
+        CLM_PROJECT = srcName || CLM_PROJECT;
+        S.colorMap = buildColorMap(discoverTypes());
+        refreshHeightDefaults();
+        showFileStatus(S.raw.length, srcName);
+        probeImages();
+
+        const noDims = S.raw.filter(i => !i.length_mm || !i.width_mm).length;
+
+        alertMsg(
+            'Loaded ' + S.raw.length + ' items \u2014 ' + discoverTypes().length + ' type(s) detected'
+            + (noDims ? ' (' + noDims + ' with incomplete dims \u2014 assumed size will be used)' : ''),
+            noDims ? 'warning' : 'success'
+        );
+    }
+
+    function handleFile(file) {
+        if (!file) return;
+
+        file.arrayBuffer().then(buf => {
+            const text = decodeUploadBuffer(buf).replace(/^\uFEFF/, '');
+            const firstLine = text.split(/\r\n|\n|\r/).find(l => l.trim()) || '';
+            const delim = firstLine.includes('\t') ? '\t' : ',';
+
+            Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true,
+                delimiter: delim,
+                complete(r) {
+                    if (r.errors.length && !r.data.length) {
+                        alertMsg('Parse error: ' + r.errors.map(e => e.message).join('; '), 'error');
+                        return;
+                    }
+
+                    ingestRows(r.data, r.meta.fields || [], file.name);
+                }
+            });
+        }).catch(e => {
+            alertMsg('Could not read file: ' + e.message, 'error');
+        });
+    }
+
+    function loadSample() {
+        S.raw = JSON.parse(JSON.stringify(SAMPLE));
+        S.heightDefaults = {
+            'Pendant': 15,
+            'Hei tiki': 20,
+            'Tool': 50,
+            'Mere': 60,
+            'Boulder': 150,
+            'Modern': 45,
+            'Raw': 100
+        };
+
+        S.colorMap = buildColorMap(discoverTypes());
+        rebuildHeightDefaultsUI();
+        CLM_PROJECT = 'CaPackyBara sample';
+        showFileStatus(S.raw.length, 'sample data');
+        alertMsg('Loaded ' + S.raw.length + ' sample items', 'success');
+    }
+
+    function showFileStatus(n, src) {
+        const el = $('file-status');
+        el.classList.remove('hidden');
+        el.className = 'text-xs text-matcha mt-2 font-medium';
+        el.textContent = `\u2713 ${n} items from ${src}`;
+        setStatus(n + ' items loaded');
+    }
+
+    /* ================================================================
+       PACKING ALGORITHM
+    ================================================================ */
+    function orientForPacking(item) {
+        return CLM_CORE.dims.sortDesc(item.length_mm, item.width_mm, item.height_mm);
+    }
+
+    function applyPadding(item, cfg) {
+        return CLM_CORE.cratepack.applyPadding(item, cfg);
+    }
+
+    function snapDepth(h, depths) {
+        return CLM_CORE.cratepack.snapDepth(h, depths);
+    }
+
+    function process(raw, cfg) {
+        return CLM_CORE.cratepack.process(raw, cfg);
+    }
+
+    function groupKey(item, strategy) {
+        return CLM_CORE.cratepack.groupKey(item, strategy);
+    }
+
+    function groupItems(items, strategy) {
+        return CLM_CORE.cratepack.groupItems(items, strategy);
+    }
+
+    function shelf2D(items, cL, cW) {
+        return CLM_CORE.pack2d.shelf2D(items, cL, cW);
+    }
+
+    function mergeFreeRects(rects) {
+        return CLM_CORE.pack2d.mergeFreeRects(rects);
+    }
+
+    function trayUtil(items, tL, tW, tD) {
+        return CLM_CORE.pack2d.trayUtil(items, tL, tW, tD);
+    }
+
+function packTrays(groups, cfg, trayInventory) {
+        return CLM_CORE.cratepack.packTrays(groups, cfg, trayInventory);
+    }
+
+    function consolidate(trays, cfg) {
+        return CLM_CORE.cratepack.consolidate(trays, cfg);
+    }
+
+    function crateHeight(trays, allow) {
+        return CLM_CORE.cratepack.crateHeight(trays, allow);
+    }
+
+    function buildCrates(trays, allow, maxCrate, trayStruct) {
+        return CLM_CORE.cratepack.buildCrates(trays, allow, maxCrate, trayStruct);
+    }
+    function validatePlacements(trays) {
+        return CLM_CORE.cratepack.validatePlacements(trays);
+    }
+
+    function runPacker() {
+        if (!S.raw.length) {
+            alertMsg('No items loaded.', 'warning');
+            return;
+        }
+
+        const cfg = getConfig();
+
+        if (!cfg.trayDepths.length) {
+            alertMsg('Configure at least one tray depth.', 'warning');
+            return;
+        }
+
+        if (!cfg.footprints.length) {
+            alertMsg('Configure at least one tray footprint.', 'warning');
+            return;
+        }
+
+        let fps = cfg.footprints;
+
+        if (cfg.maxCrate.l > 0) {
+            fps = fps.filter(fp => (fp.l + 2 * cfg.trayStruct.sideWall + 2 * cfg.allow.sides) <= cfg.maxCrate.l);
+        }
+
+        if (cfg.maxCrate.w > 0) {
+            fps = fps.filter(fp => (fp.w + 2 * cfg.trayStruct.sideWall + 2 * cfg.allow.sides) <= cfg.maxCrate.w);
+        }
+
+        if (!fps.length) {
+            alertMsg('No footprints fit within max crate L/W. Adjust limits.', 'error');
+            return;
+        }
+
+        cfg.footprints = fps;
+
+        if (cfg.maxCrate.h > 0) {
+            const minH = cfg.allow.base + cfg.allow.top + cfg.trayDepths[0] + cfg.trayStruct.base + cfg.trayStruct.lid;
+
+            if (minH > cfg.maxCrate.h) {
+                alertMsg(
+                    `Max height ${cfg.maxCrate.h}mm is too small for even the shallowest tray (${cfg.trayDepths[0]}mm + structural + allowances).`,
+                    'error'
+                );
+                return;
+            }
+        }
+
+        $('loading').style.display = 'flex';
+        setStatus('Packing...');
+
+        setTimeout(() => {
+            try {
+                const items = process(S.raw, cfg);
+                S.colorMap = buildColorMap([...new Set(items.map(i => i.type))].sort());
+
+                const grps = groupItems(items, cfg.grouping);
+
+                // Clone inventory so we don't mutate the config object on re-runs
+                const invClone = { ...cfg.trayInventory };
+                let { trays, unpacked } = packTrays(grps, cfg, invClone);
+
+                const pV = validatePlacements(trays);
+                if (pV) console.warn(pV + ' placement violations');
+
+                trays = consolidate(trays, cfg);
+                const crates = buildCrates(trays, cfg.allow, cfg.maxCrate, cfg.trayStruct); // Added cfg.trayStruct
+
+                let allCrates = [...crates];
+                let finalUnpacked = [...unpacked];
+
+                if (cfg.createOvrCrates && finalUnpacked.length > 0) {
+                    const ovr = CLM_CORE.cratepack.makeOversizedCrates(finalUnpacked, cfg);
+                    allCrates = [...crates, ...ovr.crates];
+                    finalUnpacked = ovr.unpacked;
+                }
+                // Restart tray numbering inside each crate
+                allCrates.forEach(c => {
+                    c.trays.forEach((t, i) => {
+                        t.trayNo = i + 1;
+                    });
+                });
+                const overCrates = allCrates.filter(c => c.overMax);
+
+                if (overCrates.length) {
+                    alertMsg(
+                        overCrates.length + ' crate(s) exceed max dimensions — they were not avoidable with current footprints.',
+                        'warning'
+                    );
+                }
+
+                S.result = {
+                    crates: allCrates,
+                    unpacked: finalUnpacked,
+                    cfg,
+                    total: S.raw.length,
+                    packed: S.raw.length - finalUnpacked.length
+                };
+                const noTraysCount = finalUnpacked.filter(i => i.unpackedReason === 'no_trays').length;
+                if (noTraysCount > 0) {
+                    alertMsg(`${noTraysCount} item(s) unpacked because tray inventory is exhausted.`, 'warning');
+                }
+                render3D(S.result);
+                renderTable(S.result);
+                renderTrays(S.result);
+
+                $('btn-export').disabled = false;
+                $('btn-clm-out').disabled = false;
+                $('btn-print-pdf').disabled = false;
+
+                setStatus(`Packed ${S.result.packed}/${S.result.total} \u2192 ${allCrates.length} crate(s)`);
+
+                alertMsg(
+                    `Done: ${allCrates.length} crate(s), ${finalUnpacked.length} unpacked`,
+                    finalUnpacked.length ? 'warning' : 'success'
+                );
+            } catch (e) {
+                alertMsg('Error: ' + e.message, 'error');
+                console.error(e);
+            } finally {
+                $('loading').style.display = 'none';
+            }
+        }, 60);
+    }
+
+    /* ================================================================
+       THREE.JS
+    ================================================================ */
+    function init3D() {
+        const canvas = $('three-canvas');
+        const container = canvas.parentElement;
+
+        S.scene = new THREE.Scene();
+        S.scene.background = new THREE.Color(0xF4F1EA);
+
+        S.cam = new THREE.PerspectiveCamera(
+            45,
+            container.clientWidth / container.clientHeight,
+            1,
+            50000
+        );
+
+        S.cam.position.set(1500, 1200, 2000);
+
+        S.ren = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true
+        });
+
+        S.ren.setSize(container.clientWidth, container.clientHeight);
+        S.ren.setPixelRatio(Math.min(devicePixelRatio, 2));
+        S.ren.shadowMap.enabled = true;
+        S.ren.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        S.ctrl = new OrbitControls(S.cam, S.ren.domElement);
+        S.ctrl.enableDamping = true;
+        S.ctrl.dampingFactor = .07;
+        S.ctrl.maxDistance = 12000;
+        S.ctrl.minDistance = 50;
+
+        S.scene.add(new THREE.AmbientLight(0xEAE5DA, .6));
+
+        const dl = new THREE.DirectionalLight(0xFFF5E1, .9);
+        dl.position.set(1000, 2000, 1500);
+        dl.castShadow = true;
+        dl.shadow.mapSize.set(1024, 1024);
+        dl.shadow.camera.near = 100;
+        dl.shadow.camera.far = 6000;
+        dl.shadow.camera.left = -2500;
+        dl.shadow.camera.right = 2500;
+        dl.shadow.camera.top = 2500;
+        dl.shadow.camera.bottom = -2500;
+        S.scene.add(dl);
+
+        S.scene.add(
+            new THREE.DirectionalLight(0xDCD5C7, .3)
+                .translateX(-1000)
+                .translateY(500)
+        );
+
+        S.scene.add(new THREE.GridHelper(6000, 60, 0xDCD5C7, 0xEAE5DA));
+
+        const gp = new THREE.Mesh(
+            new THREE.PlaneGeometry(6000, 6000),
+            new THREE.ShadowMaterial({ opacity: .08, color: 0x8C735A })
+        );
+
+        gp.rotation.x = -Math.PI / 2;
+        gp.receiveShadow = true;
+        gp.position.y = -.5;
+        S.scene.add(gp);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            S.ctrl.update();
+
+            S.ray.setFromCamera(S.mouse, S.cam);
+            const hits = S.ray.intersectObjects(S.meshes);
+
+            if (S.hovered) {
+                S.hovered.material.emissive.setHex(0);
+                S.hovered = null;
+            }
+
+            if (hits.length) {
+                const m = hits[0].object;
+
+                if (m.userData.item) {
+                    m.material.emissive.setHex(0x333333);
+                    S.hovered = m;
+                    showTip(m.userData.item, m.userData.cid, m.userData.tid);
+                }
+            } else {
+                $('tooltip').style.display = 'none';
+            }
+
+            S.ren.render(S.scene, S.cam);
+        }
+
+        animate();
+
+        window.addEventListener('resize', resize3D);
+        new ResizeObserver(resize3D).observe(container);
+
+        canvas.addEventListener('mousemove', onMM);
+        canvas.addEventListener('mouseleave', () => $('tooltip').style.display = 'none');
+    }
+
+    function resize3D() {
+        const c = $('three-canvas').parentElement;
+        const w = c.clientWidth;
+        const h = c.clientHeight;
+
+        if (!w || !h) return;
+
+        S.cam.aspect = w / h;
+        S.cam.updateProjectionMatrix();
+        S.ren.setSize(w, h);
+    }
+
+    function onMM(e) {
+        const r = $('three-canvas').getBoundingClientRect();
+
+        S.mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+        S.mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+
+        const tip = $('tooltip');
+
+        if (tip.style.display === 'block') {
+            tip.style.left = (e.clientX + 16) + 'px';
+            tip.style.top = (e.clientY + 16) + 'px';
+        }
+    }
+
+    function showTip(it, cid, tid) {
+        const tip = $('tooltip');
+        tip.style.display = 'block';
+
+        const loc = cid === 'Uncrated'
+            ? '<span class="text-[#A35D47] font-medium">Uncrated item</span>'
+            : `Crate ${cid} \u00b7 Tray ${tid}`;
+
+        tip.innerHTML = `
+            <div class="font-display font-semibold mb-1 text-ink text-sm">${escapeHtml(it.name)}</div>
+            <div class="text-muted mb-2 text-xs uppercase tracking-wider">${escapeHtml(it.type)}</div>
+            <div class="text-xs mb-0.5">Orig: ${it.length_mm}\u00d7${it.width_mm}\u00d7${it.height_mm} mm</div>
+            <div class="text-xs mb-2">Pad: ${it.pL}\u00d7${it.pW}\u00d7${it.pH} mm</div>
+            <div class="text-muted mt-1 text-[0.65rem] uppercase tracking-wider border-t border-bdr pt-2">${loc}</div>
+        `;
+    }
+
+    function makeSprite(text, color) {
+        const cv = document.createElement('canvas');
+        const cx = cv.getContext('2d');
+
+        cv.width = 512;
+        cv.height = 96;
+
+        cx.font = '500 42px Inter, sans-serif';
+        cx.fillStyle = color || '#2D2A26';
+        cx.textAlign = 'center';
+        cx.textBaseline = 'middle';
+        cx.fillText(text, 256, 48);
+
+        const tex = new THREE.CanvasTexture(cv);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: tex,
+            transparent: true
+        }));
+
+        sp.scale.set(220, 40, 1);
+        return sp;
+    }
+
+    function layoutCrates2D(crates, gap = 150) {
+        if (!crates.length) {
+            return {
+                positions: [],
+                bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 }
+            };
+        }
+
+        const sorted = [...crates].sort((a, b) => (b.ext.l * b.ext.w) - (a.ext.l * a.ext.w));
+
+        const totalArea = sorted.reduce((sum, c) => {
+            return sum + (c.ext.l + gap) * (c.ext.w + gap);
+        }, 0);
+
+        let maxRowW = Math.max(
+            ...sorted.map(c => c.ext.l),
+            Math.sqrt(totalArea)
+        );
+
+        const positions = [];
+        let x = 0;
+        let z = 0;
+        let rowH = 0;
+
+        for (const c of sorted) {
+            if (x > 0 && x + c.ext.l > maxRowW) {
+                x = 0;
+                z += rowH + gap;
+                rowH = 0;
+            }
+
+            positions.push({
+                crate: c,
+                x,
+                z
+            });
+
+            x += c.ext.l + gap;
+            rowH = Math.max(rowH, c.ext.w);
+        }
+
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minZ = Infinity;
+        let maxZ = -Infinity;
+
+        for (const p of positions) {
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x + p.crate.ext.l);
+            minZ = Math.min(minZ, p.z);
+            maxZ = Math.max(maxZ, p.z + p.crate.ext.w);
+        }
+
+        const centerX = (minX + maxX) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+
+        for (const p of positions) {
+            p.x -= centerX;
+            p.z -= centerZ;
+        }
+
+        return {
+            positions,
+            bounds: {
+                minX: minX - centerX,
+                maxX: maxX - centerX,
+                minZ: minZ - centerZ,
+                maxZ: maxZ - centerZ
+            }
+        };
+    }
+
+    function render3D(data) {
+        const rm = [];
+
+        S.scene.traverse(c => {
+            if (c.userData.packed) rm.push(c);
+        });
+
+        rm.forEach(o => {
+            o.geometry?.dispose();
+            o.material?.dispose();
+
+            if (o.material?.map) {
+                o.material.map.dispose();
+            }
+
+            S.scene.remove(o);
+        });
+
+        S.meshes = [];
+
+        const hasContent = !!data && (data.crates.length > 0 || data.unpacked.length > 0);
+
+        $('empty-state').classList.toggle('hidden', hasContent);
+
+        if (!hasContent) {
+            $('legend').classList.add('hidden');
+            return;
+        }
+
+        const types = new Set();
+
+        data.crates.forEach(c => {
+            c.trays.forEach(t => {
+                t.items.forEach(i => {
+                    types.add(i.type.split('/')[0]);
+                });
+            });
+        });
+
+        data.unpacked.forEach(it => {
+            types.add(it.type.split('/')[0]);
+        });
+
+        const leg = $('legend-items');
+        leg.innerHTML = '';
+
+        [...types].sort().forEach(t => {
+            const css = S.colorMap[t]?.css || '#7A7369';
+
+            leg.innerHTML += `
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-sm inline-block" style="background:${css}"></span>
+                    <span class="text-xs tracking-wide">${t}</span>
+                </div>
+            `;
+        });
+
+        $('legend').classList.toggle('hidden', types.size === 0);
+
+        const al = data.cfg.allow;
+        const { positions, bounds } = layoutCrates2D(data.crates, 150);
+
+        for (const pos of positions) {
+            const crate = pos.crate;
+            const { l, w, h } = crate.ext;
+
+            const cx = pos.x + l / 2;
+            const cz = pos.z + w / 2;
+
+            const edgeColor = crate.overMax
+                ? 0xA35D47
+                : (crate.isOversized ? 0xA87C65 : 0x2D2A26);
+
+            const cGeo = new THREE.BoxGeometry(l, h, w);
+
+            const cLine = new THREE.LineSegments(
+                new THREE.EdgesGeometry(cGeo),
+                new THREE.LineBasicMaterial({
+                    color: edgeColor,
+                    opacity: .8,
+                    transparent: true
+                })
+            );
+
+            cLine.position.set(cx, h / 2, cz);
+            cLine.userData.packed = true;
+            S.scene.add(cLine);
+
+            const cFill = new THREE.Mesh(
+                new THREE.BoxGeometry(l + .5, h + .5, w + .5),
+                new THREE.MeshBasicMaterial({
+                    color: 0xFCFAF6,
+                    opacity: .4,
+                    transparent: true,
+                    side: THREE.BackSide
+                })
+            );
+
+            cFill.position.set(cx, h / 2, cz);
+            cFill.userData.packed = true;
+            S.scene.add(cFill);
+
+            const lblText = crate.isOversized
+                ? crate.id
+                : `Crate ${crate.id}${crate.overMax ? ' !' : ''}`;
+
+            const lblColor = crate.overMax
+                ? '#A35D47'
+                : (crate.isOversized ? '#A87C65' : '#2D2A26');
+
+            const lbl = makeSprite(lblText, lblColor);
+            lbl.position.set(cx, h + 35, cz);
+            lbl.userData.packed = true;
+            S.scene.add(lbl);
+
+            let yOff = al.base;
+
+            for (let ti = 0; ti < crate.trays.length; ti++) {
+                const tray = crate.trays[ti];
+
+                // Use external dimensions for the tray mesh
+                const tL = tray.extL || (tray.fp.l + 2 * data.cfg.trayStruct.sideWall);
+                const tW = tray.extW || (tray.fp.w + 2 * data.cfg.trayStruct.sideWall);
+                const tD = tray.extD || (tray.depth + data.cfg.trayStruct.base + data.cfg.trayStruct.lid);
+
+                const tMesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(tL, tD, tW),
+                    new THREE.MeshPhongMaterial({
+                        color: 0xE6DFD1,
+                        opacity: .6,
+                        transparent: true,
+                        depthWrite: false
+                    })
+                );
+
+                tMesh.position.set(cx, yOff + tD / 2, cz);
+                tMesh.userData.packed = true;
+                S.scene.add(tMesh);
+
+                const tEdge = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(new THREE.BoxGeometry(tL, tD, tW)),
+                    new THREE.LineBasicMaterial({
+                        color: 0xB8A58F,
+                        opacity: .6,
+                        transparent: true
+                    })
+                );
+
+                tEdge.position.copy(tMesh.position);
+                tEdge.userData.packed = true;
+                S.scene.add(tEdge);
+
+                const trayDisplayNo = tray.trayNo ?? tray.id;
+                const tLbl = makeSprite(`C${crate.id}-T${trayDisplayNo}`, '#7A7369');
+                tLbl.position.set(cx, yOff + tD + 18, cz);
+                tLbl.scale.set(120, 24, 1);
+                tLbl.userData.packed = true;
+                S.scene.add(tLbl);
+
+                // Items are placed relative to the INTERNAL footprint
+                // The internal footprint is centered within the external footprint
+                const internalOffsetX = (tL - tray.fp.l) / 2;
+                const internalOffsetZ = (tW - tray.fp.w) / 2;
+
+                const trayMinX = cx - tL / 2 + internalOffsetX;
+                const trayMinZ = cz - tW / 2 + internalOffsetZ;
+
+                for (const item of tray.items) {
+                    const iL = item.pl;
+                    const iW = item.pw;
+                    const iH = item.pH;
+
+                    const rawType = item.type.split('/')[0];
+                    const col = S.colorMap[rawType]?.hex || 0x888888;
+
+                    const safeX = Math.max(0, Math.min(item.px, tray.fp.l - iL));
+                    const safeZ = Math.max(0, Math.min(item.pz, tray.fp.w - iW));
+
+                    const itemCX = trayMinX + safeX + iL / 2;
+                    const itemCZ = trayMinZ + safeZ + iW / 2;
+
+                    const iGeo = new THREE.BoxGeometry(
+                        Math.max(1, iL - 2),
+                        Math.max(1, iH - 2),
+                        Math.max(1, iW - 2)
+                    );
+
+                    const iMesh = new THREE.Mesh(
+                        iGeo,
+                        new THREE.MeshPhongMaterial({
+                            color: col,
+                            opacity: .95,
+                            transparent: true,
+                            shininess: 20
+                        })
+                    );
+
+                    iMesh.position.set(itemCX, yOff + iH / 2, itemCZ);
+                    iMesh.castShadow = true;
+                    iMesh.receiveShadow = true;
+                    iMesh.userData.packed = true;
+                    iMesh.userData.item = item;
+                    iMesh.userData.cid = crate.id;
+                    iMesh.userData.tid = trayDisplayNo;
+
+                    S.scene.add(iMesh);
+                    S.meshes.push(iMesh);
+
+                    const iEdge = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(iGeo),
+                        new THREE.LineBasicMaterial({
+                            color: 0x2D2A26,
+                            opacity: .15,
+                            transparent: true
+                        })
+                    );
+
+                    iEdge.position.copy(iMesh.position);
+                    iEdge.userData.packed = true;
+                    S.scene.add(iEdge);
+                }
+
+                yOff += tD; // Advance Y by external tray depth
+
+                if (ti < crate.trays.length - 1) {
+                    yOff += al.interlayer;
+                }
+            }
+        }
+
+        if (data.unpacked.length > 0) {
+            const uxStart = bounds.maxX + 500;
+            const maxRowW = 2500;
+            const colG = 18;
+            const rowG = 18;
+
+            const sorted = [...data.unpacked].sort((a, b) => (b.pL * b.pW) - (a.pL * a.pW));
+
+            let ux = 0;
+            let uz = 0;
+            let urh = 0;
+
+            let ubL = Infinity;
+            let ubR = -Infinity;
+            let ubF = Infinity;
+            let ubB = -Infinity;
+            let maxIH = 0;
+
+            for (const item of sorted) {
+                const iL = item.pL;
+                const iW = item.pW;
+                const iH = item.pH;
+
+                maxIH = Math.max(maxIH, iH);
+
+                const rawType = item.type.split('/')[0];
+                const col = S.colorMap[rawType]?.hex || 0x888888;
+
+                if (ux > 0 && ux + iL > maxRowW) {
+                    uz += urh + rowG;
+                    ux = 0;
+                    urh = 0;
+                }
+
+                const iGeo = new THREE.BoxGeometry(
+                    Math.max(1, iL - 2),
+                    Math.max(1, iH - 2),
+                    Math.max(1, iW - 2)
+                );
+
+                const iMat = new THREE.MeshPhongMaterial({
+                    color: col,
+                    opacity: 0.85,
+                    transparent: true,
+                    shininess: 20,
+                    emissive: 0xA35D47,
+                    emissiveIntensity: 0.1
+                });
+
+                const iMesh = new THREE.Mesh(iGeo, iMat);
+
+                iMesh.position.set(uxStart + ux + iL / 2, iH / 2, uz + iW / 2);
+                iMesh.castShadow = true;
+                iMesh.receiveShadow = true;
+                iMesh.userData.packed = true;
+                iMesh.userData.item = item;
+                iMesh.userData.cid = 'Uncrated';
+                iMesh.userData.tid = '-';
+
+                S.scene.add(iMesh);
+                S.meshes.push(iMesh);
+
+                const iEdge = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(iGeo),
+                    new THREE.LineBasicMaterial({
+                        color: 0xA35D47,
+                        opacity: 0.4,
+                        transparent: true
+                    })
+                );
+
+                iEdge.position.copy(iMesh.position);
+                iEdge.userData.packed = true;
+                S.scene.add(iEdge);
+
+                ubL = Math.min(ubL, uxStart + ux);
+                ubR = Math.max(ubR, uxStart + ux + iL);
+                ubF = Math.min(ubF, uz);
+                ubB = Math.max(ubB, uz + iW);
+
+                ux += iL + colG;
+                urh = Math.max(urh, iW);
+            }
+
+            const bw = ubR - ubL + 80;
+            const bd = ubB - ubF + 80;
+            const bh = Math.min(maxIH + 50, 280);
+
+            const bcx = (ubL + ubR) / 2;
+            const bcz = (ubF + ubB) / 2;
+
+            const ubGeo = new THREE.BoxGeometry(bw, bh, bd);
+
+            const ubLine = new THREE.LineSegments(
+                new THREE.EdgesGeometry(ubGeo),
+                new THREE.LineBasicMaterial({
+                    color: 0xA35D47,
+                    opacity: 0.4,
+                    transparent: true
+                })
+            );
+
+            ubLine.position.set(bcx, bh / 2, bcz);
+            ubLine.userData.packed = true;
+            S.scene.add(ubLine);
+
+            const uFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(bw - 10, bd - 10),
+                new THREE.MeshPhongMaterial({
+                    color: 0xA35D47,
+                    opacity: 0.04,
+                    transparent: true,
+                    depthWrite: false
+                })
+            );
+
+            uFloor.rotation.x = -Math.PI / 2;
+            uFloor.position.set(bcx, 1.5, bcz);
+            uFloor.userData.packed = true;
+            S.scene.add(uFloor);
+
+            const uLbl = makeSprite(`UNCRATED (${data.unpacked.length})`, '#A35D47');
+            uLbl.position.set(bcx, bh + 35, bcz);
+            uLbl.userData.packed = true;
+            S.scene.add(uLbl);
+        }
+
+        const totalW = bounds.maxX - bounds.minX;
+        const totalD = bounds.maxZ - bounds.minZ;
+        const maxDim = Math.max(totalW, totalD, 500);
+        const camDist = Math.max(1800, maxDim * 1.2);
+
+        S.ctrl.target.set(0, 300, 0);
+        S.cam.position.set(camDist * 0.5, 1400, camDist + 600);
+        S.ctrl.update();
+    }
+
+    /* ================================================================
+       RESULTS TABLE & EXPORT
+    ================================================================ */
+    function renderTable(data) {
+        $('res-placeholder').classList.add('hidden');
+        $('res-content').classList.remove('hidden');
+
+        const traysN = data.crates.reduce((s, c) => s + c.trays.length, 0);
+        const overN = data.crates.filter(c => c.overMax).length;
+
+        $('res-summary').innerHTML = `
+            <div class="stat-card">
+                <div class="text-[0.65rem] text-muted mb-1 uppercase tracking-wider font-sans">Crates</div>
+                <div class="text-3xl font-display font-semibold text-ink">
+                    ${data.crates.length}
+                    ${overN ? `<span class="text-[#A35D47] text-sm ml-2 font-sans font-normal">(${overN} over)</span>` : ''}
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="text-[0.65rem] text-muted mb-1 uppercase tracking-wider font-sans">Trays</div>
+                <div class="text-3xl font-display font-semibold text-ink">${traysN}</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="text-[0.65rem] text-muted mb-1 uppercase tracking-wider font-sans">Packed</div>
+                <div class="text-3xl font-display font-semibold text-matcha">${data.packed}</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="text-[0.65rem] text-muted mb-1 uppercase tracking-wider font-sans">Unpacked</div>
+                <div class="text-3xl font-display font-semibold ${data.unpacked.length ? 'text-[#A35D47]' : 'text-matcha'}">
+                    ${data.unpacked.length}
+                </div>
+            </div>
+        `;
+
+        const cc = $('crate-cards');
+        cc.innerHTML = '';
+
+        data.crates.forEach(c => {
+            const crateTitle = c.isOversized ? c.id : `Crate ${c.id}`;
+            const borderClass = c.overMax
+                ? 'border-[#A35D47]/40'
+                : (c.isOversized ? 'border-clay/40' : '');
+
+            const labelClass = c.overMax
+                ? 'text-[#A35D47]'
+                : (c.isOversized ? 'text-clay' : 'text-accent');
+
+            cc.innerHTML += `
+                <div class="inline-block stat-card mr-3 mb-3 ${borderClass}" style="min-width:150px">
+                    <div class="text-[0.65rem] ${labelClass} font-sans font-semibold uppercase tracking-wider mb-2">
+                        ${crateTitle}${c.overMax ? ' \u26a0' : ''}
+                    </div>
+                    <div class="text-sm text-ink font-display font-medium mb-1">
+                        ${c.ext.l}\u00d7${c.ext.w}\u00d7${c.ext.h}
+                    </div>
+                    <div class="text-[0.65rem] text-muted uppercase tracking-wider">
+                        ${c.trays.length} tray(s)
+                    </div>
+                </div>
+            `;
+        });
+
+        const tb = $('res-tbody');
+        tb.innerHTML = '';
+
+        for (const c of data.crates) {
+            for (const t of c.trays) {
+                for (const it of t.items) {
+                    const tr = document.createElement('tr');
+
+                    const rawT = it.type.split('/')[0];
+                    const css = S.colorMap[rawT]?.css || '#7A7369';
+
+                    let statusHtml = '<span class="text-matcha font-medium">Packed</span>';
+
+                    if (c.isOversized) {
+                        statusHtml = c.overMax
+                            ? '<span class="text-[#A35D47] font-medium">Oversized (Exceeds Max)</span>'
+                            : '<span class="text-clay font-medium">Oversized Individual</span>';
+                    } else if (c.overMax) {
+                        statusHtml = '<span class="text-[#A35D47] font-medium">Packed (Over Max)</span>';
+                    }
+
+                    const crateLabel = c.isOversized
+                        ? c.id
+                        : `Crate ${c.id}${c.overMax ? ' !' : ''}`;
+
+                    tr.innerHTML = `
+                        <td class="font-medium text-ink">${crateLabel}</td>
+                        <td class="text-muted">Tray ${t.trayNo ?? t.id}</td>
+                        <td class="font-medium">${escapeHtml(it.name)}</td>
+                        <td><span style="color:${css}" class="font-medium">${escapeHtml(it.type)}</span></td>
+                        <td class="text-muted">${it.length_mm}\u00d7${it.width_mm}\u00d7${it.height_mm}</td>
+                        <td class="text-muted">${it.pL}\u00d7${it.pW}\u00d7${it.pH}</td>
+                        <td class="text-muted">${t.fp.l}\u00d7${t.fp.w} (d${t.depth})</td>
+                        <td>${statusHtml}</td>
+                    `;
+
+                    tb.appendChild(tr);
+                }
+            }
+        }
+
+for (const it of data.unpacked) {
+    const tr = document.createElement('tr');
+    const isInventoryLimit = it.unpackedReason === 'no_trays';
+    const statusText = isInventoryLimit 
+        ? 'UNPACKED — Tray Inventory Exhausted' 
+        : 'UNPACKED — Requires Custom Crate';
+    const statusClass = isInventoryLimit ? 'text-clay' : 'text-[#A35D47]';
+
+    tr.innerHTML = `
+    <td class="text-muted">\u2014</td>
+    <td class="text-muted">\u2014</td>
+    <td class="font-medium">${escapeHtml(it.name)}</td>
+    <td class="font-medium">${escapeHtml(it.type)}</td>
+    <td class="text-muted">${it.length_mm}\u00d7${it.width_mm}\u00d7${it.height_mm}</td>
+    <td class="text-muted">${it.pL}\u00d7${it.pW}\u00d7${it.pH}</td>
+    <td class="text-muted">\u2014</td>
+    <td class="${statusClass} font-medium">${statusText}</td>
+    `;
+    tb.appendChild(tr);
+}
+    }
+
+    function exportCSV() {
+        if (!S.result) return;
+
+        const formatDimensions = (...dimensions) => `${dimensions.join('x')}mm`;
+
+        const fields = [
+            'section',
+            'setting',
+            'value',
+            'crate_id',
+            'crate_length_external_mm',
+            'crate_width_external_mm',
+            'crate_height_external_mm',
+            'tray_id',
+            'tray_length_internal_mm',
+            'tray_width_internal_mm',
+            'tray_depth_internal_mm',
+            'tray_length_external_mm',
+            'tray_width_external_mm',
+            'tray_depth_external_mm',
+            'item_name',
+            'type',
+            'original_dims',
+            'padded_dims',
+            'tray_footprint',
+            'status'
+        ];
+
+        const rows = [];
+
+        const addRow = (section, values = {}) => {
+            rows.push({ section, ...values });
+        };
+
+        const addSettings = (value, prefix = '') => {
+            if (value && typeof value === 'object') {
+                if (Array.isArray(value)) {
+                    value.forEach((entry, index) => addSettings(entry, `${prefix}[${index}]`));
+                } else {
+                    Object.entries(value).forEach(([key, entry]) => {
+                        addSettings(entry, prefix ? `${prefix}.${key}` : key);
+                    });
+                }
+                return;
+            }
+
+            addRow('settings', {
+                setting: prefix,
+                value: value === undefined || value === null ? '' : String(value)
+            });
+        };
+
+        addSettings(S.result.cfg);
+
+        for (const c of S.result.crates) {
+            const crateLabel = c.isOversized ? c.id : `Crate ${c.id}`;
+
+            addRow('crates', {
+                crate_id: crateLabel,
+                crate_length_external_mm: c.ext.l,
+                crate_width_external_mm: c.ext.w,
+                crate_height_external_mm: c.ext.h,
+                status: c.isOversized
+                    ? 'Oversized'
+                    : (c.overMax ? 'Over Max' : 'Within Max')
+            });
+
+            for (const t of c.trays) {
+                const trayLabel = `Tray ${t.trayNo ?? t.id}`;
+                const trayLengthExternal = t.extL ?? (t.fp.l + 2 * S.result.cfg.trayStruct.sideWall);
+                const trayWidthExternal = t.extW ?? (t.fp.w + 2 * S.result.cfg.trayStruct.sideWall);
+                const trayDepthExternal = t.extD ?? (t.depth + S.result.cfg.trayStruct.base + S.result.cfg.trayStruct.lid);
+
+                addRow('trays', {
+                    crate_id: crateLabel,
+                    tray_id: trayLabel,
+                    tray_length_internal_mm: t.fp.l,
+                    tray_width_internal_mm: t.fp.w,
+                    tray_depth_internal_mm: t.depth,
+                    tray_length_external_mm: trayLengthExternal,
+                    tray_width_external_mm: trayWidthExternal,
+                    tray_depth_external_mm: trayDepthExternal,
+                    status: c.isOversized ? 'Oversized' : 'Packed'
+                });
+
+                for (const it of t.items) {
+                    let status = 'Packed';
+
+                    if (c.isOversized) {
+                        status = c.overMax
+                            ? 'Oversized (Exceeds Max)'
+                            : 'Oversized Individual';
+                    } else if (c.overMax) {
+                        status = 'Packed (Over Max)';
+                    }
+
+                    rows.push({
+                        section: 'items',
+                        crate_id: crateLabel,
+                        tray_id: trayLabel,
+                        item_name: it.name,
+                        type: it.type,
+                        original_dims: formatDimensions(it.length_mm, it.width_mm, it.height_mm),
+                        padded_dims: formatDimensions(it.pL, it.pW, it.pH),
+                        tray_footprint: `${formatDimensions(t.fp.l, t.fp.w)} (d${t.depth}mm)`,
+                        status
+                    });
+                }
+            }
+        }
+
+for (const it of S.result.unpacked) {
+    const status = it.unpackedReason === 'no_trays' 
+        ? 'UNPACKED - Tray Inventory Exhausted' 
+        : 'UNPACKED - Requires Custom Crate';
+        
+    rows.push({
+        section: 'items',
+        crate_id: '\u2014',
+        tray_id: '\u2014',
+        item_name: it.name,
+        type: it.type,
+        original_dims: formatDimensions(it.length_mm, it.width_mm, it.height_mm),
+        padded_dims: formatDimensions(it.pL, it.pW, it.pH),
+        tray_footprint: '\u2014',
+        status
+    });
+}
+
+        const blob = new Blob([Papa.unparse({ fields, data: rows })], {
+            type: 'text/csv;charset=utf-8;'
+        });
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'capackybara_results.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        alertMsg('CSV exported', 'success');
+    }
+
+    /* ================================================================
+       TRAY LAYOUT (TOP-DOWN) VIEW
+    ================================================================ */
+    const TRAY_VIEW = {
+        zoom: 2.5,   // on-screen diagram size multiplier (2.5 = +150%)
+        scale: 0.3,
+        dirtyViz: false,
+        dirtyTable: false
+    };
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function round1(n) {
+        return Math.round(n * 10) / 10;
+    }
+
+    function itemCellDims(it) {
+        return { L: it.pl ?? it.pL, W: it.pw ?? it.pW };
+    }
+
+    function itemTrueBox(it) {
+        const cell = itemCellDims(it);
+        const padL = (it.pL ?? 0) - (it.bL ?? it.pL ?? 0);
+        const padW = (it.pW ?? 0) - (it.bW ?? it.pW ?? 0);
+
+        return {
+            L: cell.L - (it.rot ? padW : padL),
+            W: cell.W - (it.rot ? padL : padW)
+        };
+    }
+
+    function trayItemsSorted(tray) {
+        return [...tray.items].sort((a, b) =>
+            (a.pz ?? 0) - (b.pz ?? 0) ||
+            (a.px ?? 0) - (b.px ?? 0) ||
+            String(a.name).localeCompare(String(b.name))
+        );
+    }
+
+    function findItemTray(item) {
+        if (!S.result) return null;
+
+        for (const c of S.result.crates) {
+            for (const t of c.trays) {
+                if (t.items.includes(item)) return { crate: c, tray: t };
+            }
+        }
+
+        return null;
+    }
+
+    function recomputeUtil(tray) {
+        tray.util = trayUtil(tray.items, tray.fp.l, tray.fp.w, tray.depth);
+    }
+
+    function makeItemNode(it, num, scale, interactive) {
+        const cellBox = itemCellDims(it);
+        const tb = itemTrueBox(it);
+
+        const cell = document.createElement('div');
+        cell.className = 'tray-cell';
+        cell.style.left = ((it.px || 0) * scale) + 'px';
+        cell.style.top = ((it.pz || 0) * scale) + 'px';
+        cell.style.width = (cellBox.L * scale) + 'px';
+        cell.style.height = (cellBox.W * scale) + 'px';
+
+        const box = document.createElement('div');
+        box.className = 'tray-item' + (interactive ? '' : ' static');
+        box.style.left = (((cellBox.L - tb.L) / 2) * scale) + 'px';
+        box.style.top = (((cellBox.W - tb.W) / 2) * scale) + 'px';
+        box.style.width = Math.max(1, tb.L * scale) + 'px';
+        box.style.height = Math.max(1, tb.W * scale) + 'px';
+        box.dataset.num = num;
+
+        const rawT = String(it.type || '').split('/')[0];
+        const css = S.colorMap[rawT]?.css || '#7A7369';
+        box.style.borderColor = css;
+        box.style.background = it.img ? '#fff' : (css + '22');
+
+        if (it.img) {
+            const wrap = document.createElement('div');
+            wrap.className = 'img-wrap';
+
+            const im = document.createElement('img');
+            im.alt = it.name || '';
+            setImgSrc(im, it.img, () => wrap.remove());
+
+            wrap.appendChild(im);
+            box.appendChild(wrap);
+        }
+
+        const badge = document.createElement('span');
+        badge.className = 'tray-num';
+        badge.textContent = num;
+        box.appendChild(badge);
+
+        box.title = '#' + num + ' ' + (it.name || '')
+            + (it.summary && it.summary !== it.name ? '\n' + it.summary : '')
+            + '\nItem: ' + round1(tb.L) + '\u00d7' + round1(tb.W) + ' mm'
+            + ' \u00b7 with padding: ' + cellBox.L + '\u00d7' + cellBox.W + ' mm';
+
+        if (interactive) {
+            box.addEventListener('pointerdown', onTrayItemDown);
+            box.addEventListener('dblclick', onTrayItemDbl);
+            box._item = it;
+        }
+
+        cell.appendChild(box);
+        return cell;
+    }
+
+    function buildTrayBlock(tray, crate, opts) {
+        const scale = opts.scale;
+
+        const block = document.createElement('div');
+        block.className = 'tray-block' + (opts.print ? ' print-tray-block' : '');
+
+        const crateLabel = crate.isOversized ? crate.id : ('Crate ' + crate.id);
+        const tNo = tray.trayNo ?? tray.id;
+
+        const head = document.createElement('div');
+        head.className = 'tray-head';
+
+        const title = document.createElement('div');
+        title.className = 'tray-title';
+        title.textContent = crateLabel + ' \u00b7 Tray ' + tNo;
+
+        const sub = document.createElement('div');
+        sub.className = 'tray-sub';
+        sub.textContent = 'Internal footprint ' + tray.fp.l + '\u00d7' + tray.fp.w + ' mm'
+            + ' \u00b7 depth ' + tray.depth + ' mm'
+            + ' \u00b7 ' + tray.items.length + ' item(s)'
+            + ' \u00b7 scale 1:' + Math.round(1 / (scale * 0.2646));
+
+        head.append(title, sub);
+        block.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'tray-body' + (opts.print ? ' print' : '');
+
+        const wrap = document.createElement('div');
+        wrap.className = 'tray-diagram-wrap';
+
+        const diag = document.createElement('div');
+        diag.className = 'tray-diagram';
+        diag.style.width = (tray.fp.l * scale) + 'px';
+        diag.style.height = (tray.fp.w * scale) + 'px';
+        diag._tray = tray;
+        diag._scale = scale;
+
+        const ordered = trayItemsSorted(tray);
+
+        ordered.forEach((it, i) => {
+            diag.appendChild(makeItemNode(it, i + 1, scale, !!opts.interactive));
+        });
+
+        wrap.appendChild(diag);
+
+        const bar = document.createElement('div');
+        bar.className = 'scale-bar';
+
+        const barLine = document.createElement('span');
+        barLine.className = 'bar';
+        barLine.style.width = (100 * scale) + 'px';
+
+        const barTxt = document.createElement('span');
+        barTxt.textContent = '100 mm';
+
+        bar.append(barLine, barTxt);
+        wrap.appendChild(bar);
+        body.appendChild(wrap);
+
+        const legend = document.createElement('div');
+        legend.className = 'tray-legend' + (opts.print ? ' print' : '');
+
+        if (opts.print && opts.legendCols) {
+            legend.style.columnCount = opts.legendCols;
+        }
+
+        ordered.forEach((it, i) => {
+            const e = document.createElement('div');
+            e.className = 'legend-entry';
+
+            const numEl = document.createElement('span');
+            numEl.className = 'legend-num';
+            numEl.textContent = i + 1;
+            e.appendChild(numEl);
+
+            if (it.img) {
+                const th = document.createElement('img');
+                th.className = 'legend-thumb';
+                th.alt = '';
+                setImgSrc(th, it.img, () => th.remove());
+                e.appendChild(th);
+            }
+
+            const tb = itemTrueBox(it);
+
+            const txt = document.createElement('div');
+            txt.className = 'legend-txt';
+
+            const nmEl = document.createElement('div');
+            nmEl.className = 'legend-name';
+            nmEl.textContent = it.name || '(unnamed)';
+            nmEl.title = it.summary || it.name || '';
+
+            const dm = document.createElement('div');
+            dm.className = 'legend-dims';
+            dm.textContent = round1(tb.L) + '\u00d7' + round1(tb.W) + ' mm';
+
+            txt.append(nmEl, dm);
+            e.appendChild(txt);
+
+            if (opts.interactive) {
+                e.addEventListener('mouseenter', () => highlightItem(diag, i + 1, true));
+                e.addEventListener('mouseleave', () => highlightItem(diag, i + 1, false));
+            }
+
+            legend.appendChild(e);
+        });
+
+        body.appendChild(legend);
+        block.appendChild(body);
+
+        return block;
+    }
+
+    function highlightItem(diag, num, on) {
+        const el = diag.querySelector('.tray-item[data-num="' + num + '"]');
+        if (el) el.classList.toggle('hl', on);
+    }
+
+    function renderTrays(data) {
+        const ph = $('trays-placeholder');
+        const cont = $('trays-content');
+        const list = $('trays-list');
+
+        list.innerHTML = '';
+
+        const traysAll = [];
+        (data?.crates || []).forEach(c => c.trays.forEach(t => traysAll.push({ crate: c, tray: t })));
+
+        if (!traysAll.length) {
+            ph.classList.remove('hidden');
+            cont.classList.add('hidden');
+            return;
+        }
+
+        ph.classList.add('hidden');
+        cont.classList.remove('hidden');
+
+        let maxL = 1;
+        let maxW = 1;
+
+        traysAll.forEach(({ tray }) => {
+            maxL = Math.max(maxL, tray.fp.l);
+            maxW = Math.max(maxW, tray.fp.w);
+        });
+
+        const scale = Math.min(560 / maxL, 430 / maxW) * TRAY_VIEW.zoom;
+        TRAY_VIEW.scale = scale;
+
+        $('trays-meta').textContent = traysAll.length + ' tray(s) \u00b7 '
+            + data.crates.length + ' crate(s) \u00b7 shared scale 1:' + Math.round(1 / (scale * 0.2646));
+
+        traysAll.forEach(({ crate, tray }) => {
+            list.appendChild(buildTrayBlock(tray, crate, { scale, interactive: true }));
+        });
+    }
+
+    /* ---- manual move / rotate ---- */
+    let dragState = null;
+
+    function onTrayItemDown(e) {
+        if (e.button !== undefined && e.button !== 0) return;
+
+        const box = e.currentTarget;
+        const it = box._item;
+        const rect = box.getBoundingClientRect();
+
+        const ghost = box.cloneNode(true);
+        ghost.className = 'tray-item drag-ghost';
+        ghost.style.left = '0px';
+        ghost.style.top = '0px';
+        ghost.style.width = rect.width + 'px';
+        ghost.style.height = rect.height + 'px';
+        document.body.appendChild(ghost);
+
+        dragState = {
+            it,
+            box,
+            ghost,
+            offX: e.clientX - rect.left,
+            offY: e.clientY - rect.top,
+            moved: false
+        };
+
+        box.classList.add('dragging');
+
+        document.addEventListener('pointermove', onTrayItemMove);
+        document.addEventListener('pointerup', onTrayItemUp);
+        document.addEventListener('pointercancel', onTrayItemUp);
+
+        moveGhost(e.clientX, e.clientY);
+        e.preventDefault();
+    }
+
+    function moveGhost(x, y) {
+        if (!dragState) return;
+        dragState.ghost.style.left = (x - dragState.offX) + 'px';
+        dragState.ghost.style.top = (y - dragState.offY) + 'px';
+    }
+
+    function onTrayItemMove(e) {
+        if (!dragState) return;
+        dragState.moved = true;
+        moveGhost(e.clientX, e.clientY);
+    }
+
+    function onTrayItemUp(e) {
+        if (!dragState) return;
+
+        const ds = dragState;
+        dragState = null;
+
+        document.removeEventListener('pointermove', onTrayItemMove);
+        document.removeEventListener('pointerup', onTrayItemUp);
+        document.removeEventListener('pointercancel', onTrayItemUp);
+        ds.box.classList.remove('dragging');
+        ds.ghost.style.display = 'none';
+
+        if (ds.moved) {
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const diag = el && el.closest ? el.closest('.tray-diagram') : null;
+
+            if (diag && diag._tray) {
+                const tray = diag._tray;
+                const scale = diag._scale;
+                const r = diag.getBoundingClientRect();
+                const it = ds.it;
+                const cell = itemCellDims(it);
+
+                let x = (e.clientX - ds.offX - r.left) / scale;
+                let z = (e.clientY - ds.offY - r.top) / scale;
+
+                x = Math.max(0, Math.min(x, Math.max(0, tray.fp.l - cell.L)));
+                z = Math.max(0, Math.min(z, Math.max(0, tray.fp.w - cell.W)));
+
+                it.px = round1(x);
+                it.pz = round1(z);
+
+                const cur = findItemTray(it);
+
+                if (cur && cur.tray !== tray) {
+                    cur.tray.items = cur.tray.items.filter(x2 => x2 !== it);
+                    tray.items.push(it);
+                    recomputeUtil(cur.tray);
+
+                    if ((it.pH || 0) > tray.depth) {
+                        alertMsg(
+                            'Note: item height (' + it.pH + 'mm) exceeds the target tray depth (' + tray.depth + 'mm).',
+                            'warning'
+                        );
+                    }
+                }
+
+                recomputeUtil(tray);
+                refreshAfterLayoutEdit();
+            }
+        }
+
+        ds.ghost.remove();
+    }
+
+    function onTrayItemDbl(e) {
+        const it = e.currentTarget._item;
+
+        if (it.pl !== undefined && it.pl !== null) {
+            const t = it.pl;
+            it.pl = it.pw;
+            it.pw = t;
+            it.rot = !it.rot;
+        } else {
+            let t = it.pL; it.pL = it.pW; it.pW = t;
+            t = it.bL; it.bL = it.bW; it.bW = t;
+        }
+
+        const cur = findItemTray(it);
+
+        if (cur) {
+            const cell = itemCellDims(it);
+            it.px = Math.max(0, Math.min(it.px || 0, Math.max(0, cur.tray.fp.l - cell.L)));
+            it.pz = Math.max(0, Math.min(it.pz || 0, Math.max(0, cur.tray.fp.w - cell.W)));
+        }
+
+        refreshAfterLayoutEdit();
+    }
+
+    function refreshAfterLayoutEdit() {
+        TRAY_VIEW.dirtyViz = true;
+        TRAY_VIEW.dirtyTable = true;
+        renderTrays(S.result);
+    }
+
+    /* ---- PDF export (print dialog -> "Save as PDF", one tray per page) ---- */
+    function buildPrintRoot() {
+        const root = $('print-root');
+        root.innerHTML = '';
+
+        if (!S.result) return 0;
+
+        const PAGE_H = 733;   // A4 landscape content height at 8mm margins (96dpi px)
+        const PAGE_W = 1062;  // A4 landscape content width
+
+        // off-screen stage for measuring real (wrapped) legend heights
+        const stage = document.createElement('div');
+        stage.style.cssText = 'position:absolute;left:-12000px;top:0;width:' + PAGE_W + 'px;visibility:hidden';
+        document.body.appendChild(stage);
+
+        let pages = 0;
+
+        S.result.crates.forEach(crate => {
+            crate.trays.forEach(tray => {
+                const items = Math.max(1, tray.items.length);
+                let cols = Math.max(3, Math.min(8, Math.ceil(items / 15)));
+
+                const make = (sc, c) => {
+                    const b = buildTrayBlock(tray, crate, {
+                        scale: sc,
+                        interactive: false,
+                        print: true,
+                        legendCols: c
+                    });
+                    stage.appendChild(b);
+                    return b;
+                };
+
+                let scale = Math.min(PAGE_W / tray.fp.l, 430 / tray.fp.w);
+                let blk = make(scale, cols);
+
+                // widen the numbered list until it is reasonably short
+                while (blk.querySelector('.tray-legend').offsetHeight > 430 && cols < Math.min(8, items)) {
+                    cols++;
+                    blk.remove();
+                    blk = make(scale, cols);
+                }
+
+                // shrink the diagram until the whole block fits one page
+                let guard = 0;
+
+                while (blk.offsetHeight > PAGE_H && guard < 8) {
+                    const diag = blk.querySelector('.tray-diagram');
+                    const over = blk.offsetHeight - PAGE_H;
+                    const newDiagH = Math.max(150, diag.offsetHeight - over);
+                    scale = scale * (newDiagH / diag.offsetHeight);
+                    blk.remove();
+                    blk = make(scale, cols);
+                    guard++;
+                }
+
+                blk.remove();
+
+                const page = document.createElement('div');
+                page.className = 'print-page';
+                page.appendChild(blk);
+                root.appendChild(page);
+                pages++;
+            });
+        });
+
+        stage.remove();
+        return pages;
+    }
+
+    async function exportPDF() {
+        if (!S.result) return;
+
+        const pages = buildPrintRoot();
+
+        if (!pages) {
+            alertMsg('No trays to export.', 'warning');
+            return;
+        }
+
+        setStatus('Preparing PDF\u2026');
+
+        const imgs = [...$('print-root').querySelectorAll('img')];
+
+        await Promise.all(imgs.map(im => (
+            im.complete
+                ? Promise.resolve()
+                : new Promise(res => {
+                    im.onload = im.onerror = res;
+                })
+        )));
+
+        setStatus('Ready');
+
+        alertMsg(
+            'In the print dialog choose \u201cSave as PDF\u201d as the destination \u2014 one tray per landscape A4 page.',
+            'info'
+        );
+
+        setTimeout(() => window.print(), 80);
+    }
+
+    /* ================================================================
+       TABS
+    ================================================================ */
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === tab);
+        });
+
+        $('tab-viz').classList.toggle('hidden', tab !== 'viz');
+        $('tab-results').classList.toggle('hidden', tab !== 'results');
+        $('tab-trays').classList.toggle('hidden', tab !== 'trays');
+
+        if (tab === 'viz') {
+            if (TRAY_VIEW.dirtyViz && S.result) {
+                render3D(S.result);
+                TRAY_VIEW.dirtyViz = false;
+            }
+
+            setTimeout(resize3D, 50);
+        }
+
+        if (tab === 'results' && TRAY_VIEW.dirtyTable && S.result) {
+            renderTable(S.result);
+            TRAY_VIEW.dirtyTable = false;
+        }
+    }
+
+    /* ================================================================
+       HELP MODAL
+    ================================================================ */
+    function initHelp() {
+        const modal = document.getElementById('help-modal');
+        const backdrop = document.getElementById('help-backdrop');
+        const panel = document.getElementById('help-panel');
+        const openBtn = document.getElementById('btn-open-help');
+        const closeBtn = document.getElementById('btn-close-help');
+
+        if (!modal || !backdrop || !panel || !openBtn || !closeBtn) {
+            console.warn('Help modal elements missing.');
+            return;
+        }
+
+        function openHelp() {
+            modal.classList.remove('hidden');
+
+            requestAnimationFrame(() => {
+                backdrop.classList.remove('opacity-0');
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeHelp() {
+            backdrop.classList.add('opacity-0');
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        openBtn.addEventListener('click', openHelp);
+        closeBtn.addEventListener('click', closeHelp);
+        backdrop.addEventListener('click', closeHelp);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeHelp();
+            }
+        });
+    }
+
+    /* ================================================================
+       CLM/1 SUITE HAND-OFF  (shared across suite apps — see README.md)
+    ================================================================ */
+    function exportCLM() {
+        if (!S.result) { alertMsg('Run the packer first.', 'warning'); return; }
+
+        const items = [];
+        const containers = [];
+        const tS = S.result.cfg.trayStruct;
+
+        S.result.crates.forEach(c => {
+            const crateId = c.isOversized ? String(c.id) : ('Crate ' + c.id);
+            const trayIds = [];
+
+            c.trays.forEach(t => {
+                const trayId = crateId + ' \u00b7 Tray ' + (t.trayNo ?? t.id);
+                trayIds.push(trayId);
+                containers.push({
+                    id: trayId,
+                    kind: 'tray',
+                    parent: crateId,
+                    l: t.extL ?? (t.fp.l + 2 * tS.sideWall),
+                    w: t.extW ?? (t.fp.w + 2 * tS.sideWall),
+                    h: t.extD ?? (t.depth + tS.base + tS.lid),
+                    external: true,
+                    meta: {
+                        footprintInternal: [t.fp.l, t.fp.w],
+                        depthInternal: t.depth,
+                        type: t.type,
+                        util: Math.round((t.util || 0) * 100) / 100
+                    }
+                });
+
+                t.items.forEach((it, k) => {
+                    items.push({
+                        id: it.acc || (crateId + '-' + (t.trayNo ?? t.id) + '-' + (k + 1)),
+                        name: it.name,
+                        type: it.type,
+                        dims: { l: it.length_mm, w: it.width_mm, h: it.height_mm },
+                        dimsAssumed: !!it.dimAssumed,
+                        padding: { pL: it.pL, pW: it.pW, pH: it.pH },
+                        image: it.img || undefined,
+                        placement: {
+                            container: crateId,
+                            tray: trayId,
+                            x: it.px,
+                            z: it.pz,
+                            rot: it.rot ? 90 : 0
+                        }
+                    });
+                });
+            });
+
+            containers.push({
+                id: crateId,
+                kind: 'crate',
+                l: c.ext.l, w: c.ext.w, h: c.ext.h,
+                external: true,
+                children: trayIds,
+                meta: { isOversized: !!c.isOversized, overMax: !!c.overMax }
+            });
+        });
+
+        (S.result.unpacked || []).forEach((it, k) => {
+            items.push({
+                id: it.acc || ('unpacked-' + (k + 1)),
+                name: it.name,
+                type: it.type,
+                dims: { l: it.length_mm, w: it.width_mm, h: it.height_mm },
+                dimsAssumed: !!it.dimAssumed,
+                notes: it.unpackedReason === 'no_trays'
+                    ? 'not packed \u2014 tray inventory exhausted'
+                    : 'not packed \u2014 needs custom crate'
+            });
+        });
+
+        const m = CLM.make(CLM_PROJECT, 'capackybara', items, containers, []);
+        CLM.download(m, String(CLM_PROJECT).replace(/[^\w\-]+/g, '_') + '-manifest.json');
+        CLM.handoff(m);
+        alertMsg('Manifest downloaded \u2014 open it in Stick it on a Shelf ("Load Manifest") or inspect it in index.html.', 'success');
+    }
+
+    function loadCLMManifest(m) {
+        const rows = (m.items || []).filter(it => it && it.name && it.dims);
+        S.raw = rows.map(it => ({
+            name: String(it.name),
+            summary: String(it.name),
+            acc: it.id ? String(it.id) : '',
+            type: normType(it.type || ''),
+            length_mm: numOrNull(it.dims.l),
+            width_mm: numOrNull(it.dims.w),
+            height_mm: numOrNull(it.dims.h),
+            img: it.image ? String(it.image) : ''
+        }));
+
+        if (!S.raw.length) { alertMsg('Manifest has no usable items.', 'warning'); return; }
+
+        CLM_PROJECT = (m.project ? String(m.project) : 'manifest') + ' (manifest)';
+        S.colorMap = buildColorMap(discoverTypes());
+        refreshHeightDefaults();
+        showFileStatus(S.raw.length, 'manifest \u2014 ' + ((m.source && m.source.app) || 'suite'));
+        probeImages();
+        alertMsg('Loaded ' + S.raw.length + ' item(s) from manifest \u201c' + (m.project || 'Untitled') + '\u201d', 'success');
+    }
+
+    function handleCLMFile(file) {
+        if (!file) return;
+        file.text().then(txt => {
+            let m;
+            try { m = CLM.parse(txt); }
+            catch (e) { alertMsg('Not a valid clm/1 manifest: ' + e.message, 'error'); return; }
+            loadCLMManifest(m);
+        }).catch(e => alertMsg('Could not read manifest: ' + e.message, 'error'));
+    }
+
+    /* ================================================================
+       INIT
+    ================================================================ */
+    function init() {
+        initFps();
+        init3D();
+
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.addEventListener('click', () => switchTab(b.dataset.tab));
+        });
+
+        $('csv-upload').addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        $('btn-media-folder').addEventListener('click', () => $('media-folder').click());
+        $('media-folder').addEventListener('change', e => {
+            const n = ingestMediaFolder(e.target.files);
+            e.target.value = '';
+
+            if (!n) {
+                alertMsg('No images found in that folder', 'warning');
+                return;
+            }
+
+            alertMsg('Local images folder loaded: ' + n + ' image(s). They stay in your browser \u2014 nothing is uploaded.', 'success');
+            if (S.result) renderTrays(S.result);
+            else if (S.raw.length) probeImages();
+        });
+
+        $('btn-sample').addEventListener('click', loadSample);
+
+        $('btn-clm-in').addEventListener('click', () => $('clm-file').click());
+        $('clm-file').addEventListener('change', e => {
+            if (e.target.files[0]) handleCLMFile(e.target.files[0]);
+            e.target.value = '';
+        });
+        $('btn-clm-out').addEventListener('click', exportCLM);
+        CLM.offerBanner('capackybara', loadCLMManifest);
+
+        $('btn-add-fp').addEventListener('click', () => addFpRow());
+
+        $('btn-add-type').addEventListener('click', () => {
+            const name = $('new-type-name').value.trim();
+            const height = parseFloat($('new-type-height').value) || 50;
+
+            if (!name) {
+                alertMsg('Enter a type name', 'warning');
+                return;
+            }
+
+            S.heightDefaults[name] = height;
+            rebuildHeightDefaultsUI();
+
+            $('new-type-name').value = '';
+            $('new-type-height').value = '';
+        });
+
+        $('btn-run').addEventListener('click', runPacker);
+        $('btn-export').addEventListener('click', exportCSV);
+        $('btn-print-pdf').addEventListener('click', exportPDF);
+
+        initHelp();
+
+        setStatus('Ready \u2014 load data to begin');
+    }
+
+    // keep sample load aware of new fields
+    // (SAMPLE rows carry no image refs; tray view shows plain boxes for them)
+
+    init();
+    </script>
 </body>
 </html>
