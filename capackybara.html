@@ -435,10 +435,11 @@
             border: none;
             padding: 0;
             margin-top: 8px;
-            columns: 4;
-            column-gap: 14px;
-            column-width: 60mm;
+            display: flex;
+            gap: 14px;
         }
+
+        .tray-legend.print .legend-col { flex: 1 1 0; min-width: 0; }
 
         .tray-legend.print .legend-entry {
             break-inside: avoid;
@@ -451,6 +452,65 @@
         .tray-legend.print .legend-name { font-size: 8.5px; line-height: 1.25; }
         .tray-legend.print .legend-dims { font-size: 7px; }
         .tray-legend.print .legend-entry { font-size: 8.5px; }
+
+        /* Compact rows: one fixed-height line per item, no thumbnail (dense trays) */
+        .tray-legend.print .legend-entry.compact {
+            align-items: center;
+            gap: 5px;
+            height: 13px;
+            padding: 0 3px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .tray-legend.print .legend-entry.compact .legend-num {
+            width: 13px;
+            height: 13px;
+            line-height: 13px;
+            font-size: 7.5px;
+            border-radius: 7px;
+        }
+
+        .tray-legend.print .legend-entry.compact .legend-txt {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
+        .tray-legend.print .legend-entry.compact .legend-name {
+            flex: 1 1 0;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 8px;
+            line-height: 13px;
+        }
+
+        .tray-legend.print .legend-entry.compact .legend-dims {
+            flex: 0 0 auto;
+            margin-top: 0;
+            font-size: 6.5px;
+            line-height: 13px;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
+        /* Larger single-line rows for item list pages, where there is room */
+        .tray-legend.print .legend-entry.compact.large { height: 17px; gap: 7px; }
+
+        .tray-legend.print .legend-entry.compact.large .legend-num {
+            width: 16px;
+            height: 16px;
+            line-height: 16px;
+            font-size: 9px;
+            border-radius: 8px;
+        }
+
+        .tray-legend.print .legend-entry.compact.large .legend-name { font-size: 10.5px; line-height: 17px; }
+        .tray-legend.print .legend-entry.compact.large .legend-dims { font-size: 8px; line-height: 17px; }
 
         .legend-entry {
             display: flex;
@@ -497,7 +557,26 @@
 
         #print-root { display: none; }
 
-        @page { size: A4 landscape; margin: 8mm; }
+        /* Print blocks. Declared outside @media print so the off-screen measuring stage
+           lays them out exactly as the printed page will. */
+        .print-tray-block { border: none; padding: 0; margin: 0; overflow: visible; }
+        .print-tray-block .tray-title { font-size: 13px; }
+        .print-tray-block .tray-sub { font-size: 8px; }
+        .print-tray-block .tray-diagram-wrap { display: block; }
+
+        /* Smaller number badges when items are small on the page */
+        .tray-diagram.badge-sm .tray-num {
+            min-width: 12px;
+            height: 12px;
+            padding: 0 2px;
+            top: -5px;
+            left: -5px;
+            font-size: 8px;
+            line-height: 12px;
+            border-radius: 6px;
+        }
+
+        @page { size: A4 portrait; margin: 8mm; }
 
         @media print {
             body {
@@ -520,11 +599,6 @@
                 break-after: auto;
                 page-break-after: auto;
             }
-
-            .print-tray-block { border: none; padding: 0; margin: 0; }
-        .print-tray-block .tray-title { font-size: 13px; }
-        .print-tray-block .tray-sub { font-size: 8px; }
-        .print-tray-block .tray-diagram-wrap { display: block; }
 
             .tray-item, .tray-num, .legend-num, .legend-thumb, .tray-diagram {
                 -webkit-print-color-adjust: exact;
@@ -558,13 +632,6 @@
         <div class="flex items-center gap-4">
             <span id="status-bar" class="text-xs text-muted font-sans tracking-wide">Ready</span>
 
-            <a href="index.html" title="Back to the Collection Logistics Suite" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
-                </svg>
-                Back to Hub
-            </a>
-
             <button id="btn-open-help" class="flex items-center gap-2 text-xs text-muted hover:text-accent transition-colors uppercase tracking-widest font-medium px-3 py-2 rounded-md hover:bg-surface-2 border border-transparent hover:border-bdr">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <circle cx="12" cy="12" r="10"/>
@@ -587,10 +654,6 @@
                     <input type="file" id="csv-upload" accept=".csv,.tsv,.txt" class="hidden">
                     <button onclick="document.getElementById('csv-upload').click()" class="btn-sec flex-1">Upload CSV / TSV</button>
                     <button id="btn-sample" class="btn-sec flex-1">Load Sample</button>
-                </div>
-                <div class="flex gap-3 mb-3">
-                    <input type="file" id="media-folder" webkitdirectory directory multiple class="hidden">
-                    <button id="btn-media-folder" class="btn-sec flex-1" title="Load object images from a local folder. They stay in your browser — nothing is uploaded.">Images Folder (local)</button>
                 </div>
                 <div class="flex gap-3 mb-3">
                     <input type="file" id="clm-file" accept=".json,application/json" class="hidden">
@@ -876,6 +939,7 @@
                                         <th>Crate</th>
                                         <th>Tray</th>
                                         <th>Item</th>
+                                        <th>System ID</th>
                                         <th>Type</th>
                                         <th>Original (L&times;W&times;H)</th>
                                         <th>Padded (L&times;W&times;H)</th>
@@ -950,7 +1014,7 @@
                         <ul class="space-y-2 list-disc pl-5 marker:text-accent">
                             <li>
                                 <strong>Museum TSV export:</strong>
-                                Columns are <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">Object short summary &middot; Nomenclature Classification Category &middot; Dimensions LWH comma separate &middot; Image Ref - Relative path</code>.
+                                Columns are <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">System ID (optional) &middot; Object short summary &middot; Nomenclature Classification Category &middot; Dimensions LWH comma separate &middot; Image Ref - Relative path</code>.
                             </li>
                             <li>
                                 <strong>Plain CSV:</strong>
@@ -958,7 +1022,11 @@
                             </li>
                             <li>
                                 <strong>Image refs:</strong>
-                                Images sit in a folder named after your import file, extension included, with <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">_Media</code> on the end. Each ref is read as a path inside it. So <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt_Media/</code> and <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv_Media/</code>. Two ways to supply it: drop the folder next to this HTML file (rename the import file and the folder has to follow), or use <strong>Images Folder (local)</strong> to pick any folder on your machine — matched by relative path first, then file name. Picked images stay in your browser and are never uploaded.
+                                Images sit in a folder named after your import file, extension included, with <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">_Media</code> on the end. The folder goes next to this HTML file, and each ref is read as a path inside it. So <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">frog.txt_Media/</code> and <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv</code> looks in <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">foo.tsv_Media/</code>. Rename the file and the folder has to follow, or the tray view will have nothing to show.
+                            </li>
+                            <li>
+                                <strong>Dimension cell formats:</strong>
+                                Plain <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">300, 90, 45</code> or <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">300 x 90 x 45</code> is read as L, W, H. Labelled cells are also read: any <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">n x n x n</code> triple, plus singles written as <code class="text-accent bg-surface-2 px-1.5 py-0.5 rounded text-[0.7rem]">Length: whole: 344mm</code> (Length, Width, Height, Depth, Thickness, Diameter; only the <em>whole</em> qualifier counts). Where triples and singles disagree, the larger value wins. Several triples in one cell are treated as a multi-part object and the largest value on each axis is used. If only two dimensions are given plus a whole circumference, the missing value is taken as circumference / &pi;. Units are mm unless the value carries cm or m; bracketed conversions are ignored. Items with derived depth or multi-part dimensions are listed in the load message for review.
                             </li>
                             <li>
                                 <strong>Missing dimensions:</strong>
@@ -1166,8 +1234,6 @@
     /* ================================================================
        STATE
     ================================================================ */
-    let CLM_PROJECT = 'CaPackyBara export';
-
     const S = {
         raw: [],
         result: null,
@@ -1182,6 +1248,7 @@
         heightDefaults: {},
         colorMap: {},
     };
+    let CLM_PROJECT = 'CaPackyBara export';
 
     /* ================================================================
        HELPERS
@@ -1195,7 +1262,7 @@
         return el ? parseFloat(el.value) || 0 : 0;
     }
 
-    function alertMsg(msg, type = 'info') {
+    function alertMsg(msg, type = 'info', ms = 4500) {
         const c = $('alerts');
         const d = document.createElement('div');
 
@@ -1214,7 +1281,7 @@
             d.style.opacity = '0';
             d.style.transition = 'opacity .4s';
             setTimeout(() => d.remove(), 400);
-        }, 4500);
+        }, ms);
     }
 
     function setStatus(t) {
@@ -1225,6 +1292,40 @@
     function normType(t) {
         if (!t || !String(t).trim()) return 'Unknown';
         return String(t).trim();
+    }
+
+    // Spellings that differ only by case ("Raw" / "raw") are one type. The most common
+    // spelling wins; ties go to the one seen first. Returns how many spellings were merged.
+    function canonicaliseTypes(items) {
+        const forms = {};
+
+        for (const it of items) {
+            const k = it.type.toLowerCase();
+            if (!forms[k]) forms[k] = {};
+            forms[k][it.type] = (forms[k][it.type] || 0) + 1;
+        }
+
+        const canon = {};
+        let merged = 0;
+
+        for (const [k, f] of Object.entries(forms)) {
+            const spellings = Object.entries(f).sort((a, b) => b[1] - a[1]);
+            canon[k] = spellings[0][0];
+            merged += spellings.length - 1;
+        }
+
+        items.forEach(it => { it.type = canon[it.type.toLowerCase()]; });
+        return merged;
+    }
+
+    const UNPACKED_REASON_TEXT = {
+        no_trays: 'tray inventory exhausted',
+        too_deep: 'too deep for any tray',
+        oversized: 'too large for tray footprint'
+    };
+
+    function unpackedReasonText(reason) {
+        return UNPACKED_REASON_TEXT[reason] || 'does not fit in a tray';
     }
 
     /* ================================================================
@@ -1312,8 +1413,27 @@
        CONFIG
     ================================================================ */
    function parseTrayInventory(inputStr) {
-        return CLM_CORE.cratepack.parseTrayInventory(inputStr);
-    }
+    const inventory = {};
+    const parts = inputStr.split(',').map(s => s.trim()).filter(s => s);
+    let hasLimits = false;
+
+    parts.forEach(part => {
+        if (part.includes(':')) {
+            const [d, c] = part.split(':').map(s => parseInt(s.trim()));
+            if (!isNaN(d) && !isNaN(c)) {
+                inventory[d] = c;
+                hasLimits = true;
+            }
+        } else {
+            const d = parseInt(part);
+            if (!isNaN(d)) {
+                inventory[d] = Infinity; // Infinite supply if no count is given
+            }
+        }
+    });
+
+    return { inventory, hasLimits };
+}
     function getConfig() {
         const padStr = document.querySelector('input[name="pad-strategy"]:checked').value;
 
@@ -1431,11 +1551,129 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
     }
 
     function numOrNull(x) {
-        return CLM_CORE.dims.numOrNull(x);
+        if (x === undefined || x === null) return null;
+        const n = parseFloat(String(x).trim());
+        return isFinite(n) && n > 0 ? n : null;
+    }
+
+    // ---- Dimension cell parsing --------------------------------------
+    // Handles three shapes of cell:
+    //   1. Plain:     "300, 90, 45"  /  "300 x 90 x 45"  /  "300;90;45"   (order kept as L, W, H)
+    //   2. Labelled:  "Length: whole: 344mm; Dimensions (HxWxD): 345 x 99 x 13mm"
+    //   3. Mixed:     triples ("n x n x n") plus "<Label>: whole: <n>mm" singles
+    // For labelled cells the result is sorted longest-first (packing re-sorts anyway).
+    // Units: mm (default), cm, m, read from the value itself; bracketed conversions
+    // such as "(6.5cm)" are ignored.
+    const DIM_NUM = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
+    const DIM_UNIT = '\\s*(?:(mm|cm|m)(?![a-z]))?';
+
+    function dimToMm(v, u) {
+        const n = parseFloat(v);
+        if (!isFinite(n) || n <= 0) return null;
+        const k = (u || 'mm').toLowerCase();
+        return k === 'cm' ? n * 10 : k === 'm' ? n * 1000 : n;
+    }
+
+    // Returns [l, w, h] if the cell is purely numbers + delimiters (optional units), else null.
+    function parseDimsPlain(str) {
+        const re = new RegExp('^\\s*' + DIM_NUM + '\\s*(?:(mm|cm|m))?\\s*$', 'i');
+        const out = [];
+
+        for (const piece of str.split(/[,;xX\u00d7]/)) {
+            if (!piece.trim()) { out.push(null); continue; }
+            const m = re.exec(piece);
+            if (!m) return null;
+            out.push(dimToMm(m[1], m[2]));
+        }
+
+        return out;
+    }
+
+    function parseDimsInfo(cell) {
+        const res = { dims: [null, null, null], derived: false, multi: false };
+        if (!cell) return res;
+
+        const str = String(cell);
+
+        const plain = parseDimsPlain(str);
+        if (plain) {
+            res.dims = [plain[0] ?? null, plain[1] ?? null, plain[2] ?? null];
+            return res;
+        }
+
+        // Drop bracketed conversions that follow a value, e.g. "65mm (6.5cm)"
+        let t = str.replace(/(\d\s*(?:mm|cm|m)?)\s*\([^)]*\)/gi, '$1');
+
+        // Triples: "345 x 99 x 13mm". A unit on any one value applies to the others.
+        const triples = [];
+        const triRe = new RegExp(
+            DIM_NUM + DIM_UNIT + '\\s*[x\u00d7]\\s*' + DIM_NUM + DIM_UNIT + '\\s*[x\u00d7]\\s*' + DIM_NUM + DIM_UNIT,
+            'gi'
+        );
+        t = t.replace(triRe, (m, a, ua, b, ub, c, uc) => {
+            const shared = uc || ub || ua;
+            const tri = [[a, ua], [b, ub], [c, uc]].map(([v, u]) => dimToMm(v, u || shared));
+            if (tri.every(v => v != null)) triples.push(tri.sort((x, y) => y - x));
+            return ' ';
+        });
+
+        // Labelled singles, "whole" only: "Length: whole: 344mm"
+        const singles = [];
+        let circ = null;
+        const singleRe = new RegExp(
+            '\\b(length|width|height|depth|thickness|diameter|circumference)\\s*:\\s*whole\\s*:\\s*' + DIM_NUM + DIM_UNIT,
+            'gi'
+        );
+        let m;
+        while ((m = singleRe.exec(t))) {
+            const v = dimToMm(m[2], m[3]);
+            if (v == null) continue;
+            if (m[1].toLowerCase() === 'circumference') circ = Math.max(circ || 0, v);
+            else singles.push(v);
+        }
+
+        singles.sort((a, b) => b - a);
+        let vals;
+
+        if (triples.length) {
+            // Per-axis maximum across all triples (conservative envelope for multi-part objects)
+            vals = [0, 1, 2].map(i => Math.max(...triples.map(tr => tr[i])));
+            res.multi = triples.length > 1;
+
+            // Fold each single into its closest unclaimed axis, keeping the larger value
+            const claimed = [false, false, false];
+            const nearest = (v, free) => {
+                let best = -1;
+                for (let i = 0; i < 3; i++) {
+                    if (free && claimed[i]) continue;
+                    if (best < 0 || Math.abs(vals[i] - v) < Math.abs(vals[best] - v)) best = i;
+                }
+                return best;
+            };
+            for (const v of singles) {
+                let i = nearest(v, true);
+                if (i < 0) i = nearest(v, false);
+                vals[i] = Math.max(vals[i], v);
+                claimed[i] = true;
+            }
+        } else {
+            vals = singles.slice(0, 3);
+        }
+
+        // Round-section objects: fill missing slots from circumference / pi
+        if (circ != null && vals.length >= 1 && vals.length < 3) {
+            const dia = Math.round(circ / Math.PI * 10) / 10;
+            while (vals.length < 3) vals.push(dia);
+            res.derived = true;
+        }
+
+        vals.sort((a, b) => b - a);
+        res.dims = [vals[0] ?? null, vals[1] ?? null, vals[2] ?? null];
+        return res;
     }
 
     function parseDimsCell(s) {
-        return CLM_CORE.dims.parseDimsCell(s);
+        return parseDimsInfo(s).dims;
     }
 
     // Images live in a folder named after the import file (extension included)
@@ -1461,55 +1699,6 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
     // Fallback chain if the primary <file>_Media/<ref> path 404s.
     let MEDIA_FOLDER = '';
 
-    // ---- Local images folder (stays on the user's machine; never uploaded) ----
-    // "Images Folder (local)" lets the user pick an image folder from disk — e.g.
-    // when the tools are hosted on GitHub Pages but the collection data must not
-    // be published. Files become in-browser object URLs, matched against image
-    // refs by relative path first, then file name. Path-based loading next to
-    // this HTML file keeps working and is used only when no local match exists.
-    const LOCAL_MEDIA = new Map();   // lowercased key -> object URL
-    const LOCAL_MEDIA_URLS = new Set();
-    const LOCAL_MEDIA_EXT = /\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i;
-
-    function ingestMediaFolder(fileList) {
-        LOCAL_MEDIA_URLS.forEach(u => URL.revokeObjectURL(u));
-        LOCAL_MEDIA_URLS.clear();
-        LOCAL_MEDIA.clear();
-
-        Array.from(fileList || []).forEach(f => {
-            if (!LOCAL_MEDIA_EXT.test(f.name)) return;
-
-            const url = URL.createObjectURL(f);
-            LOCAL_MEDIA_URLS.add(url);
-
-            const rel = (f.webkitRelativePath || f.name).replace(/\\/g, '/').replace(/^\/+/, '');
-            const parts = rel.split('/');
-            const noTop = parts.length > 1 ? parts.slice(1).join('/') : rel;
-
-            [rel, noTop, parts[parts.length - 1], noTop.split('/').pop()].forEach(k => {
-                const key = String(k || '').trim().toLowerCase();
-                if (key && !LOCAL_MEDIA.has(key)) LOCAL_MEDIA.set(key, url);
-            });
-        });
-
-        return LOCAL_MEDIA.size;
-    }
-
-    function localSrc(candidates) {
-        for (const c of candidates) {
-            let s = String(c || '').replace(/\\/g, '/').replace(/^\/+/, '');
-            if (!s) continue;
-
-            try { s = decodeURIComponent(s); } catch (e) { s = decodeURI(s); }
-
-            const key = s.toLowerCase();
-            const hit = LOCAL_MEDIA.get(key) || LOCAL_MEDIA.get(key.split('/').pop());
-            if (hit) return hit;
-        }
-
-        return '';
-    }
-
     function imgCandidates(primary) {
         const list = [primary];
         if (!primary || !MEDIA_FOLDER) return list;
@@ -1527,13 +1716,6 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
 
     function setImgSrc(im, primary, onFail) {
         const list = imgCandidates(primary);
-
-        const local = localSrc(list);
-        if (local) {
-            im.src = local;
-            return;
-        }
-
         let i = 0;
 
         im.onerror = () => {
@@ -1551,8 +1733,6 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
         if (!first) return;
 
         const list = imgCandidates(first.img);
-        if (localSrc(list)) return;   // local folder already covers it
-
         let i = 0;
         const probe = new Image();
 
@@ -1561,7 +1741,7 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
             i++;
             if (i < list.length) { probe.src = list[i]; return; }
             alertMsg('Images not found. Expected: ' + decodeURI(list[0])
-                + ' (next to this HTML file) \u2014 or pick the folder on your machine with "Images Folder (local)"', 'warning');
+                + ' (next to this HTML file)', 'warning');
         };
         probe.src = list[0];
     }
@@ -1619,17 +1799,21 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
                 .map(row => {
                     const summary = String(row['Object short summary'] || '');
                     const info = cleanSummary(summary);
-                    const [l, w, h] = parseDimsCell(row['Dimensions LWH comma separate']);
+                    const dimInfo = parseDimsInfo(row['Dimensions LWH comma separate']);
+                    const [l, w, h] = dimInfo.dims;
 
                     return {
                         name: info.display,
                         summary: info.cleaned,
                         acc: info.acc,
                         cat: info.cat,
+                        system_id: row['System ID'] ? String(row['System ID']).trim() : null,
                         type: normType(row['Nomenclature Classification Category'] || ''),
                         length_mm: l,
                         width_mm: w,
                         height_mm: h,
+                        dimDerived: dimInfo.derived,
+                        dimMulti: dimInfo.multi,
                         img: imgPath(row['Image Ref - Relative path'] || '', folder)
                     };
                 });
@@ -1664,19 +1848,47 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
             return;
         }
 
+        invalidatePackingResult();
         CLM_PROJECT = srcName || CLM_PROJECT;
+        const mergedTypes = canonicaliseTypes(S.raw);
+
         S.colorMap = buildColorMap(discoverTypes());
         refreshHeightDefaults();
         showFileStatus(S.raw.length, srcName);
+
+        if (mergedTypes) {
+            alertMsg(mergedTypes + ' type spelling(s) differing only by case were merged', 'info');
+        }
         probeImages();
 
-        const noDims = S.raw.filter(i => !i.length_mm || !i.width_mm).length;
+        const noDimItems = S.raw.filter(i => !i.length_mm || !i.width_mm);
+        const derivedItems = S.raw.filter(i => i.dimDerived);
+        const multiItems = S.raw.filter(i => i.dimMulti);
+        const noDims = noDimItems.length;
 
-        alertMsg(
-            'Loaded ' + S.raw.length + ' items \u2014 ' + discoverTypes().length + ' type(s) detected'
-            + (noDims ? ' (' + noDims + ' with incomplete dims \u2014 assumed size will be used)' : ''),
-            noDims ? 'warning' : 'success'
-        );
+        const nameList = list => {
+            const names = list.slice(0, 5).map(i => i.name);
+            return names.join(', ') + (list.length > 5 ? ' +' + (list.length - 5) + ' more' : '');
+        };
+
+        let msg = 'Loaded ' + S.raw.length + ' items \u2014 ' + discoverTypes().length + ' type(s) detected'
+            + (noDims ? ' (' + noDims + ' with incomplete dims \u2014 assumed size will be used)' : '');
+        const notes = [];
+
+        if (noDims) notes.push('Incomplete dims: ' + nameList(noDimItems));
+        if (derivedItems.length) notes.push('Depth derived from circumference: ' + nameList(derivedItems));
+        if (multiItems.length) notes.push('Multi-part, largest envelope used: ' + nameList(multiItems));
+
+        if (notes.length) {
+            msg += '. ' + notes.join('. ') + '.';
+            console.warn('Dimension review list', {
+                incomplete: noDimItems.map(i => i.name),
+                derivedFromCircumference: derivedItems.map(i => i.name),
+                multiPart: multiItems.map(i => i.name)
+            });
+        }
+
+        alertMsg(msg, notes.length ? 'warning' : 'success', notes.length ? 15000 : 4500);
     }
 
     function handleFile(file) {
@@ -1707,6 +1919,8 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
 
     function loadSample() {
         S.raw = JSON.parse(JSON.stringify(SAMPLE));
+        invalidatePackingResult();
+        CLM_PROJECT = 'CaPackyBara sample';
         S.heightDefaults = {
             'Pendant': 15,
             'Hei tiki': 20,
@@ -1719,7 +1933,6 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
 
         S.colorMap = buildColorMap(discoverTypes());
         rebuildHeightDefaultsUI();
-        CLM_PROJECT = 'CaPackyBara sample';
         showFileStatus(S.raw.length, 'sample data');
         alertMsg('Loaded ' + S.raw.length + ' sample items', 'success');
     }
@@ -1732,62 +1945,512 @@ const depths = Object.keys(trayInventory).map(Number).sort((a, b) => a - b);
         setStatus(n + ' items loaded');
     }
 
+    function invalidatePackingResult() {
+        S.result = null;
+        $('btn-export').disabled = true;
+        $('btn-clm-out').disabled = true;
+        $('btn-print-pdf').disabled = true;
+    }
+
     /* ================================================================
        PACKING ALGORITHM
     ================================================================ */
     function orientForPacking(item) {
-        return CLM_CORE.dims.sortDesc(item.length_mm, item.width_mm, item.height_mm);
+        return [
+            Number(item.length_mm),
+            Number(item.width_mm),
+            Number(item.height_mm)
+        ].sort((a, b) => b - a);
     }
 
     function applyPadding(item, cfg) {
-        return CLM_CORE.cratepack.applyPadding(item, cfg);
+        const [baseLength, baseWidth, uprightHeight] = orientForPacking(item);
+        let pl, pw, ph;
+
+        if (cfg.padStrategy === 'proportional') {
+            const pL = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseLength * cfg.padFactor / 100));
+            const pW = Math.min(cfg.maxPad, Math.max(cfg.minPad, baseWidth * cfg.padFactor / 100));
+
+            pl = baseLength + 2 * pL;
+            pw = baseWidth + 2 * pW;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        } else {
+            pl = baseLength + 2 * cfg.flatPad;
+            pw = baseWidth + 2 * cfg.flatPad;
+            ph = uprightHeight + cfg.depthPad + cfg.lidClearance;
+        }
+
+        return {
+            ...item,
+            pL: Math.ceil(pl),
+            pW: Math.ceil(pw),
+            pH: Math.ceil(ph),
+            bL: baseLength,
+            bW: baseWidth
+        };
     }
 
     function snapDepth(h, depths) {
-        return CLM_CORE.cratepack.snapDepth(h, depths);
+        for (const d of depths) {
+            if (h <= d) return { depth: d, custom: false };
+        }
+        return { depth: Math.ceil(h / 50) * 50, custom: true };
     }
 
     function process(raw, cfg) {
-        return CLM_CORE.cratepack.process(raw, cfg);
+        const hdLower = {};
+        Object.entries(cfg.heightDefaults || {}).forEach(([k, v]) => { hdLower[k.toLowerCase()] = v; });
+
+        return raw.map(item => {
+            const it = { ...item };
+
+            if (!it.length_mm || it.length_mm <= 0) {
+                it.length_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.width_mm || it.width_mm <= 0) {
+                it.width_mm = cfg.missingDim;
+                it.dimAssumed = true;
+            }
+
+            if (!it.height_mm || it.height_mm <= 0) {
+                it.height_mm = cfg.heightDefaults[it.type] || hdLower[String(it.type).toLowerCase()] || cfg.fallbackHeight || 50;
+            }
+
+            const p = applyPadding(it, cfg);
+            const s = snapDepth(p.pH, cfg.trayDepths);
+
+            return {
+                ...p,
+                snapDepth: s.depth,
+                isCustom: s.custom
+            };
+        });
     }
 
     function groupKey(item, strategy) {
-        return CLM_CORE.cratepack.groupKey(item, strategy);
+        return strategy === 'type-depth'
+            ? `${item.type}__${item.snapDepth}`
+            : `d__${item.snapDepth}`;
     }
 
     function groupItems(items, strategy) {
-        return CLM_CORE.cratepack.groupItems(items, strategy);
+        const g = {};
+
+        for (const it of items) {
+            const k = groupKey(it, strategy);
+            if (!g[k]) {
+                g[k] = {
+                    key: k,
+                    type: it.type,
+                    depth: it.snapDepth,
+                    items: []
+                };
+            }
+            g[k].items.push(it);
+        }
+
+        return Object.values(g);
     }
 
     function shelf2D(items, cL, cW) {
-        return CLM_CORE.pack2d.shelf2D(items, cL, cW);
+        if (!items.length || cL <= 0 || cW <= 0) {
+            return { placed: [], notPlaced: [...items] };
+        }
+
+        const sorted = [...items].sort((a, b) => {
+            const am = Math.max(a.pL, a.pW);
+            const bm = Math.max(b.pL, b.pW);
+            return bm - am || (b.pL * b.pW) - (a.pL * a.pW);
+        });
+
+        const placed = [];
+        const notPlaced = [];
+        let freeRects = [{ x: 0, z: 0, w: cL, d: cW }];
+
+        for (const item of sorted) {
+            let bestFit = null;
+            let bestFitIndex = -1;
+            let bestRotation = false;
+
+            for (const [tl, tw, rot] of [[item.pL, item.pW, false], [item.pW, item.pL, true]]) {
+                for (let fi = 0; fi < freeRects.length; fi++) {
+                    const fr = freeRects[fi];
+
+                    if (tl <= fr.w && tw <= fr.d) {
+                        const waste = (fr.w * fr.d) - (tl * tw);
+
+                        if (bestFit === null || waste < bestFit.waste) {
+                            bestFit = {
+                                x: fr.x,
+                                z: fr.z,
+                                l: tl,
+                                w: tw,
+                                waste,
+                                fi
+                            };
+                            bestFitIndex = fi;
+                            bestRotation = rot;
+                        }
+                    }
+                }
+            }
+
+            if (bestFit) {
+                placed.push({
+                    ...item,
+                    px: bestFit.x,
+                    pz: bestFit.z,
+                    pl: bestFit.l,
+                    pw: bestFit.w,
+                    rot: bestRotation
+                });
+
+                const used = freeRects.splice(bestFitIndex, 1)[0];
+                const newFree = [];
+
+                if (used.w - bestFit.l > 10) {
+                    newFree.push({
+                        x: used.x + bestFit.l,
+                        z: used.z,
+                        w: used.w - bestFit.l,
+                        d: used.d
+                    });
+                }
+
+                if (used.d - bestFit.w > 10) {
+                    newFree.push({
+                        x: used.x,
+                        z: used.z + bestFit.w,
+                        w: bestFit.l,
+                        d: used.d - bestFit.w
+                    });
+                }
+
+                freeRects = [...freeRects, ...newFree];
+                freeRects = mergeFreeRects(freeRects);
+            } else {
+                notPlaced.push(item);
+            }
+        }
+
+        return { placed, notPlaced };
     }
 
     function mergeFreeRects(rects) {
-        return CLM_CORE.pack2d.mergeFreeRects(rects);
+        const merged = [];
+
+        for (let i = 0; i < rects.length; i++) {
+            let contained = false;
+
+            for (let j = 0; j < rects.length; j++) {
+                if (i === j) continue;
+
+                const a = rects[i];
+                const b = rects[j];
+
+                if (
+                    a.x >= b.x &&
+                    a.z >= b.z &&
+                    a.x + a.w <= b.x + b.w &&
+                    a.z + a.d <= b.z + b.d
+                ) {
+                    contained = true;
+                    break;
+                }
+            }
+
+            if (!contained) merged.push(rects[i]);
+        }
+
+        return merged;
     }
 
     function trayUtil(items, tL, tW, tD) {
-        return CLM_CORE.pack2d.trayUtil(items, tL, tW, tD);
+        if (!items || !items.length || tL <= 0 || tW <= 0 || tD <= 0) return 0;
+
+        return items.reduce((s, i) => {
+            return s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0);
+        }, 0) / (tL * tW * tD);
     }
 
 function packTrays(groups, cfg, trayInventory) {
-        return CLM_CORE.cratepack.packTrays(groups, cfg, trayInventory);
+    const trays = [];
+    const unpacked = [];
+    let tid = 0;
+
+    for (const grp of groups) {
+        grp.items.sort((a, b) => (b.pL * b.pW) - (a.pL * a.pW));
+        let rem = [...grp.items];
+
+        // Get all depths >= group's required depth, sorted ascending
+        const validDepths = cfg.trayDepths.filter(d => d >= grp.depth);
+
+        if (!validDepths.length) {
+            // Deeper than the deepest tray in the inventory: no tray could ever hold these
+            rem.forEach(item => item.unpackedReason = 'too_deep');
+            unpacked.push(...rem);
+            continue;
+        }
+
+        for (const fp of cfg.footprints) {
+            while (rem.length > 0) {
+                // 1. Try to pack into the current footprint
+                const res = shelf2D(rem, fp.l, fp.w);
+
+                if (res.placed.length === 0) {
+                    // Items are too large for this footprint entirely.
+                    break;
+                }
+
+                // 2. Find the smallest available depth that fits the group's requirement
+                let assignedDepth = null;
+                for (const d of validDepths) {
+                    if (trayInventory[d] > 0) {
+                        assignedDepth = d;
+                        break;
+                    }
+                }
+
+                if (!assignedDepth) {
+                    // We ran out of all valid trays.
+                    rem.forEach(item => item.unpackedReason = 'no_trays');
+                    unpacked.push(...rem);
+                    rem = [];
+                    break;
+                }
+
+                // We have a tray! Consume it from the physical inventory.
+                trayInventory[assignedDepth]--;
+
+                tid++;
+                trays.push({
+                    id: tid,
+                    fp: { l: fp.l, w: fp.w },
+                    depth: assignedDepth, // Note: This might be larger than grp.depth if we spilled over
+                    type: grp.type,
+                    items: res.placed,
+                    util: trayUtil(res.placed, fp.l, fp.w, assignedDepth)
+                });
+
+                rem = res.notPlaced;
+            }
+
+            if (rem.length === 0) break;
+        }
+
+        // If there are still items left after checking all footprints, they are physically oversized
+        if (rem.length > 0) {
+            rem.forEach(item => item.unpackedReason = 'oversized');
+            unpacked.push(...rem);
+        }
     }
 
+    return { trays, unpacked };
+}
+
     function consolidate(trays, cfg) {
-        return CLM_CORE.cratepack.consolidate(trays, cfg);
+        if (trays.length <= 1) return trays;
+
+        const res = [...trays];
+        let changed = true;
+        let iter = 0;
+
+        while (changed && iter < 100) {
+            changed = false;
+            iter++;
+
+            for (let i = 0; i < res.length && !changed; i++) {
+                if (res[i].util * 100 >= cfg.minUtil) continue;
+
+                for (let j = i + 1; j < res.length && !changed; j++) {
+                    if (res[i].fp.l !== res[j].fp.l || res[i].fp.w !== res[j].fp.w) continue;
+                    if (Math.abs(res[i].depth - res[j].depth) > cfg.maxDepthVar) continue;
+                    if (!cfg.crossType && res[i].type !== res[j].type) continue;
+
+                    const all = [...res[i].items, ...res[j].items].map(it => ({
+                        ...it,
+                        px: undefined,
+                        pz: undefined,
+                        pl: undefined,
+                        pw: undefined,
+                        rot: undefined
+                    }));
+
+                    const r2 = shelf2D(all, res[i].fp.l, res[i].fp.w);
+
+                    if (!r2.notPlaced.length) {
+                        res[i].items = r2.placed;
+                        res[i].depth = Math.max(res[i].depth, res[j].depth);
+                        res[i].util = trayUtil(r2.placed, res[i].fp.l, res[i].fp.w, res[i].depth);
+
+                        if (cfg.crossType) {
+                            res[i].type = res[i].type + '/' + res[j].type;
+                        }
+
+                        res.splice(j, 1);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        res.forEach((t, i) => t.id = i + 1);
+        return res;
+    }
+
+    // Hand the physical tray stock to the consolidated trays. A tray can use any stocked tray at
+    // least as deep as it needs. If stock is short, trays holding the most items are served first.
+    function allocateInventory(trays, inventory) {
+        const caps = [];
+
+        for (const [d, n] of Object.entries(inventory)) {
+            const count = Number.isFinite(n) ? n : trays.length; // no count given = unlimited
+            for (let i = 0; i < count; i++) caps.push(Number(d));
+        }
+
+        caps.sort((a, b) => a - b);
+
+        // Capacities are nested (a deep tray serves any shallower need), so a set of needs can be
+        // served exactly when, for each need, enough stocked trays are at least that deep.
+        const feasible = needs => {
+            const sorted = [...needs].sort((a, b) => b - a);
+            return sorted.every((need, i) => caps.filter(c => c >= need).length >= i + 1);
+        };
+
+        const order = [...trays].sort((a, b) => (b.items.length - a.items.length) || (b.depth - a.depth));
+        const keep = [];
+        const dropped = [];
+
+        for (const t of order) {
+            if (feasible([...keep.map(k => k.depth), t.depth])) keep.push(t);
+            else dropped.push(t);
+        }
+
+        // Deepest need first; each takes the shallowest stocked tray that is deep enough
+        const remaining = [...caps];
+
+        [...keep].sort((a, b) => b.depth - a.depth).forEach(t => {
+            const idx = remaining.findIndex(c => c >= t.depth);
+            t.depth = remaining.splice(idx, 1)[0];
+            t.util = trayUtil(t.items, t.fp.l, t.fp.w, t.depth);
+        });
+
+        return { trays: trays.filter(t => keep.includes(t)), dropped };
     }
 
     function crateHeight(trays, allow) {
-        return CLM_CORE.cratepack.crateHeight(trays, allow);
+        let h = allow.base + allow.top;
+
+        trays.forEach((t, i) => {
+            if (i > 0) h += allow.interlayer;
+            h += t.extD; // Use external depth (internal + base + lid)
+        });
+
+        return h;
     }
 
     function buildCrates(trays, allow, maxCrate, trayStruct) {
-        return CLM_CORE.cratepack.buildCrates(trays, allow, maxCrate, trayStruct);
+        if (!trays.length) return [];
+
+        const groups = {};
+
+        for (const t of trays) {
+            // Calculate EXTERNAL tray dimensions
+            const extTrayL = t.fp.l + (2 * trayStruct.sideWall);
+            const extTrayW = t.fp.w + (2 * trayStruct.sideWall);
+            const extTrayD = t.depth + trayStruct.base + trayStruct.lid;
+
+            const k = extTrayL + 'x' + extTrayW;
+
+            if (!groups[k]) {
+                groups[k] = {
+                    extFp: { l: extTrayL, w: extTrayW },
+                    extDepth: extTrayD,
+                    trays: []
+                };
+            }
+
+            groups[k].trays.push({
+                ...t,
+                extL: extTrayL,
+                extW: extTrayW,
+                extD: extTrayD
+            });
+        }
+
+        // Heavier trays toward the bottom of each crate
+        for (const g of Object.values(groups)) {
+            g.trays.sort((a, b) => {
+                const massA = a.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+                const massB = b.items.reduce((s, i) => s + (i.pl || i.pL) * (i.pw || i.pW) * (i.pH || 0), 0);
+
+                if (massB !== massA) return massB - massA;
+                return b.extD - a.extD;
+            });
+        }
+
+        const crates = [];
+        let cid = 0;
+
+        for (const g of Object.values(groups)) {
+            let chunk = [];
+
+            for (const tray of g.trays) {
+                const test = [...chunk, tray];
+                const testH = crateHeight(test, allow);
+
+                if (maxCrate.h > 0 && testH > maxCrate.h && chunk.length > 0) {
+                    cid++;
+                    const h = crateHeight(chunk, allow);
+                    const l = g.extFp.l + (2 * allow.sides);
+                    const w = g.extFp.w + (2 * allow.sides);
+
+                    crates.push({
+                        id: cid,
+                        ext: { l, w, h },
+                        trays: chunk,
+                        yBase: allow.base,
+                        overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                    });
+
+                    chunk = [tray];
+                } else {
+                    chunk.push(tray);
+                }
+            }
+
+            if (chunk.length > 0) {
+                cid++;
+                const h = crateHeight(chunk, allow);
+                const l = g.extFp.l + (2 * allow.sides);
+                const w = g.extFp.w + (2 * allow.sides);
+
+                crates.push({
+                    id: cid,
+                    ext: { l, w, h },
+                    trays: chunk,
+                    yBase: allow.base,
+                    overMax: (maxCrate.h > 0 && h > maxCrate.h) || (maxCrate.l > 0 && l > maxCrate.l) || (maxCrate.w > 0 && w > maxCrate.w)
+                });
+            }
+        }
+
+        return crates;
     }
     function validatePlacements(trays) {
-        return CLM_CORE.cratepack.validatePlacements(trays);
+        let v = 0;
+
+        for (const tray of trays) {
+            for (const it of tray.items) {
+                if (it.px + it.pl > tray.fp.l + 0.01 || it.pz + it.pw > tray.fp.w + 0.01) {
+                    v++;
+                }
+            }
+        }
+
+        return v;
     }
 
     function runPacker() {
@@ -1847,23 +2510,82 @@ function packTrays(groups, cfg, trayInventory) {
 
                 const grps = groupItems(items, cfg.grouping);
 
-                // Clone inventory so we don't mutate the config object on re-runs
-                const invClone = { ...cfg.trayInventory };
-                let { trays, unpacked } = packTrays(grps, cfg, invClone);
+                // Pack against an unlimited supply, consolidate, and only then hand out the physical
+                // trays. (Handing out stock group by group, before consolidation, left later groups
+                // with no trays even though consolidation freed many of them up.)
+                const supply = {};
+                cfg.trayDepths.forEach(d => { supply[d] = Infinity; });
+                let { trays, unpacked } = packTrays(grps, cfg, supply);
 
                 const pV = validatePlacements(trays);
                 if (pV) console.warn(pV + ' placement violations');
 
                 trays = consolidate(trays, cfg);
+
+                if (cfg.hasTrayLimits) {
+                    const alloc = allocateInventory(trays, cfg.trayInventory);
+                    trays = alloc.trays;
+
+                    alloc.dropped.forEach(t => t.items.forEach(item => {
+                        item.unpackedReason = 'no_trays';
+                        unpacked.push(item);
+                    }));
+                }
+
                 const crates = buildCrates(trays, cfg.allow, cfg.maxCrate, cfg.trayStruct); // Added cfg.trayStruct
 
                 let allCrates = [...crates];
                 let finalUnpacked = [...unpacked];
 
                 if (cfg.createOvrCrates && finalUnpacked.length > 0) {
-                    const ovr = CLM_CORE.cratepack.makeOversizedCrates(finalUnpacked, cfg);
-                    allCrates = [...crates, ...ovr.crates];
-                    finalUnpacked = ovr.unpacked;
+                    const oversizedCrates = [];
+                    let ovrIdx = 1;
+
+                    for (const item of finalUnpacked) {
+                        const extTrayL = item.pL + (2 * cfg.trayStruct.sideWall);
+                        const extTrayW = item.pW + (2 * cfg.trayStruct.sideWall);
+                        const extTrayD = item.pH + cfg.trayStruct.base + cfg.trayStruct.lid;
+
+                        const l = extTrayL + (2 * cfg.allow.sides);
+                        const w = extTrayW + (2 * cfg.allow.sides);
+                        const h = extTrayD + cfg.allow.base + cfg.allow.top;
+
+                        const synTray = {
+                            id: `OVR-T${ovrIdx}`,
+                            fp: { l: item.pL, w: item.pW }, // Keep internal for item placement logic
+                            depth: item.pH,
+                            extL: extTrayL,
+                            extW: extTrayW,
+                            extD: extTrayD,
+                            type: item.type,
+                            items: [{
+                                ...item,
+                                px: 0,
+                                pz: 0,
+                                pl: item.pL,
+                                pw: item.pW,
+                                rot: false
+                            }],
+                            util: 1.0
+                        };
+
+                        oversizedCrates.push({
+                            id: `OVR-${ovrIdx}`,
+                            ext: { l, w, h },
+                            trays: [synTray],
+                            yBase: cfg.allow.base,
+                            overMax:
+                                (cfg.maxCrate.h > 0 && h > cfg.maxCrate.h) ||
+                                (cfg.maxCrate.l > 0 && l > cfg.maxCrate.l) ||
+                                (cfg.maxCrate.w > 0 && w > cfg.maxCrate.w),
+                            isOversized: true
+                        });
+
+                        ovrIdx++;
+                    }
+
+                    allCrates = [...crates, ...oversizedCrates];
+                    finalUnpacked = [];
                 }
                 // Restart tray numbering inside each crate
                 allCrates.forEach(c => {
@@ -1885,11 +2607,20 @@ function packTrays(groups, cfg, trayInventory) {
                     unpacked: finalUnpacked,
                     cfg,
                     total: S.raw.length,
-                    packed: S.raw.length - finalUnpacked.length
+                    packed: S.raw.length - unpacked.length // items that are in a tray
                 };
-                const noTraysCount = finalUnpacked.filter(i => i.unpackedReason === 'no_trays').length;
-                if (noTraysCount > 0) {
-                    alertMsg(`${noTraysCount} item(s) unpacked because tray inventory is exhausted.`, 'warning');
+
+                if (unpacked.length) {
+                    const rc = {};
+                    unpacked.forEach(i => { rc[i.unpackedReason] = (rc[i.unpackedReason] || 0) + 1; });
+
+                    const parts = Object.entries(rc).map(([r, n]) => `${n} ${unpackedReasonText(r)}`);
+
+                    alertMsg(
+                        `${unpacked.length} item(s) not in a tray (${cfg.createOvrCrates ? 'custom crates' : 'unpacked'}): ${parts.join('; ')}.`,
+                        'warning',
+                        12000
+                    );
                 }
                 render3D(S.result);
                 renderTable(S.result);
@@ -1901,9 +2632,12 @@ function packTrays(groups, cfg, trayInventory) {
 
                 setStatus(`Packed ${S.result.packed}/${S.result.total} \u2192 ${allCrates.length} crate(s)`);
 
+                const customCount = cfg.createOvrCrates ? unpacked.length : 0;
+
                 alertMsg(
-                    `Done: ${allCrates.length} crate(s), ${finalUnpacked.length} unpacked`,
-                    finalUnpacked.length ? 'warning' : 'success'
+                    `Done: ${allCrates.length} crate(s), ${finalUnpacked.length} unpacked`
+                    + (customCount ? `, ${customCount} in custom crates` : ''),
+                    (finalUnpacked.length || customCount) ? 'warning' : 'success'
                 );
             } catch (e) {
                 alertMsg('Error: ' + e.message, 'error');
@@ -2602,9 +3336,10 @@ function packTrays(groups, cfg, trayInventory) {
                     let statusHtml = '<span class="text-matcha font-medium">Packed</span>';
 
                     if (c.isOversized) {
+                        const why = 'Custom crate \u2014 ' + unpackedReasonText(it.unpackedReason);
                         statusHtml = c.overMax
-                            ? '<span class="text-[#A35D47] font-medium">Oversized (Exceeds Max)</span>'
-                            : '<span class="text-clay font-medium">Oversized Individual</span>';
+                            ? '<span class="text-[#A35D47] font-medium">' + why + ' (Exceeds Max)</span>'
+                            : '<span class="text-clay font-medium">' + why + '</span>';
                     } else if (c.overMax) {
                         statusHtml = '<span class="text-[#A35D47] font-medium">Packed (Over Max)</span>';
                     }
@@ -2617,6 +3352,7 @@ function packTrays(groups, cfg, trayInventory) {
                         <td class="font-medium text-ink">${crateLabel}</td>
                         <td class="text-muted">Tray ${t.trayNo ?? t.id}</td>
                         <td class="font-medium">${escapeHtml(it.name)}</td>
+                        <td class="text-muted font-mono">${it.system_id ? escapeHtml(it.system_id) : '\u2014'}</td>
                         <td><span style="color:${css}" class="font-medium">${escapeHtml(it.type)}</span></td>
                         <td class="text-muted">${it.length_mm}\u00d7${it.width_mm}\u00d7${it.height_mm}</td>
                         <td class="text-muted">${it.pL}\u00d7${it.pW}\u00d7${it.pH}</td>
@@ -2632,15 +3368,14 @@ function packTrays(groups, cfg, trayInventory) {
 for (const it of data.unpacked) {
     const tr = document.createElement('tr');
     const isInventoryLimit = it.unpackedReason === 'no_trays';
-    const statusText = isInventoryLimit 
-        ? 'UNPACKED — Tray Inventory Exhausted' 
-        : 'UNPACKED — Requires Custom Crate';
+    const statusText = 'UNPACKED \u2014 ' + unpackedReasonText(it.unpackedReason);
     const statusClass = isInventoryLimit ? 'text-clay' : 'text-[#A35D47]';
 
     tr.innerHTML = `
     <td class="text-muted">\u2014</td>
     <td class="text-muted">\u2014</td>
     <td class="font-medium">${escapeHtml(it.name)}</td>
+    <td class="text-muted font-mono">${it.system_id ? escapeHtml(it.system_id) : '\u2014'}</td>
     <td class="font-medium">${escapeHtml(it.type)}</td>
     <td class="text-muted">${it.length_mm}\u00d7${it.width_mm}\u00d7${it.height_mm}</td>
     <td class="text-muted">${it.pL}\u00d7${it.pW}\u00d7${it.pH}</td>
@@ -2649,6 +3384,141 @@ for (const it of data.unpacked) {
     `;
     tb.appendChild(tr);
 }
+    }
+
+    function exportCLM() {
+        if (!S.result) {
+            alertMsg('Run the packer first.', 'warning');
+            return;
+        }
+
+        const items = [];
+        const containers = [];
+        const trayStruct = S.result.cfg.trayStruct;
+
+        S.result.crates.forEach(crate => {
+            const crateId = crate.isOversized ? String(crate.id) : 'Crate ' + crate.id;
+            const trayIds = [];
+
+            crate.trays.forEach(tray => {
+                const trayId = crateId + ' \u00b7 Tray ' + (tray.trayNo ?? tray.id);
+                trayIds.push(trayId);
+                containers.push({
+                    id: trayId,
+                    kind: 'tray',
+                    parent: crateId,
+                    l: tray.extL ?? (tray.fp.l + 2 * trayStruct.sideWall),
+                    w: tray.extW ?? (tray.fp.w + 2 * trayStruct.sideWall),
+                    h: tray.extD ?? (tray.depth + trayStruct.base + trayStruct.lid),
+                    external: true,
+                    meta: {
+                        footprintInternal: [tray.fp.l, tray.fp.w],
+                        depthInternal: tray.depth,
+                        type: tray.type,
+                        util: Math.round((tray.util || 0) * 100) / 100
+                    }
+                });
+
+                tray.items.forEach((item, index) => {
+                    items.push({
+                        id: item.acc || (crateId + '-' + (tray.trayNo ?? tray.id) + '-' + (index + 1)),
+                        name: item.name,
+                        type: item.type,
+                        unit: 'item',
+                        dims: { l: item.length_mm, w: item.width_mm, h: item.height_mm },
+                        dimsAssumed: !!item.dimAssumed,
+                        padding: { pL: item.pL, pW: item.pW, pH: item.pH },
+                        image: item.img || undefined,
+                        placement: {
+                            container: crateId,
+                            tray: trayId,
+                            x: item.px,
+                            z: item.pz,
+                            rot: item.rot ? 90 : 0
+                        }
+                    });
+                });
+            });
+
+            containers.push({
+                id: crateId,
+                kind: 'crate',
+                l: crate.ext.l,
+                w: crate.ext.w,
+                h: crate.ext.h,
+                external: true,
+                children: trayIds,
+                meta: { isOversized: !!crate.isOversized, overMax: !!crate.overMax }
+            });
+        });
+
+        (S.result.unpacked || []).forEach((item, index) => {
+            items.push({
+                id: item.acc || ('unpacked-' + (index + 1)),
+                name: item.name,
+                type: item.type,
+                unit: 'item',
+                dims: { l: item.length_mm, w: item.width_mm, h: item.height_mm },
+                dimsAssumed: !!item.dimAssumed,
+                notes: item.unpackedReason === 'no_trays'
+                    ? 'not packed — tray inventory exhausted'
+                    : 'not packed — needs custom crate'
+            });
+        });
+
+        const manifest = CLM.make(CLM_PROJECT, 'capackybara', items, containers, []);
+        const filename = String(CLM_PROJECT).replace(/[^\w\-]+/g, '_') + '-manifest.json';
+        CLM.download(manifest, filename);
+        CLM.handoff(manifest);
+        alertMsg('Manifest downloaded — load it in another suite tool or inspect it in index.html.', 'success');
+    }
+
+    function loadCLMManifest(manifest) {
+        const rows = manifest.items.filter(item =>
+            item && item.name && item.dims && typeof item.dims === 'object'
+        );
+        const raw = rows.map(item => ({
+            name: String(item.name),
+            summary: String(item.name),
+            acc: item.id == null ? '' : String(item.id),
+            type: normType(item.type || ''),
+            length_mm: numOrNull(item.dims.l),
+            width_mm: numOrNull(item.dims.w),
+            height_mm: numOrNull(item.dims.h),
+            dimAssumed: !!item.dimsAssumed,
+            img: item.image ? String(item.image) : ''
+        }));
+
+        if (!raw.length) {
+            alertMsg('Manifest has no usable items.', 'warning');
+            return;
+        }
+
+        invalidatePackingResult();
+        MEDIA_FOLDER = '';
+        S.raw = raw;
+        CLM_PROJECT = (manifest.project ? String(manifest.project) : 'manifest') + ' (manifest)';
+        S.colorMap = buildColorMap(discoverTypes());
+        refreshHeightDefaults();
+        showFileStatus(S.raw.length, 'manifest — ' + ((manifest.source && manifest.source.app) || 'suite'));
+        probeImages();
+        alertMsg('Loaded ' + S.raw.length + ' item(s) from manifest "' + (manifest.project || 'Untitled') + '"', 'success');
+    }
+
+    function handleCLMFile(file) {
+        if (!file) return;
+        file.text().then(text => {
+            let manifest;
+            try {
+                manifest = CLM.parse(text);
+            } catch (error) {
+                alertMsg('Not a valid clm/1 manifest: ' + error.message, 'error');
+                return;
+            }
+            loadCLMManifest(manifest);
+        }).catch(error => {
+            alertMsg('Could not read manifest: ' + error.message, 'error');
+        });
     }
 
     function exportCSV() {
@@ -2672,6 +3542,7 @@ for (const it of data.unpacked) {
             'tray_width_external_mm',
             'tray_depth_external_mm',
             'item_name',
+            'system_id',
             'type',
             'original_dims',
             'padded_dims',
@@ -2740,9 +3611,8 @@ for (const it of data.unpacked) {
                     let status = 'Packed';
 
                     if (c.isOversized) {
-                        status = c.overMax
-                            ? 'Oversized (Exceeds Max)'
-                            : 'Oversized Individual';
+                        status = 'Custom crate - ' + unpackedReasonText(it.unpackedReason)
+                            + (c.overMax ? ' (Exceeds Max)' : '');
                     } else if (c.overMax) {
                         status = 'Packed (Over Max)';
                     }
@@ -2752,6 +3622,7 @@ for (const it of data.unpacked) {
                         crate_id: crateLabel,
                         tray_id: trayLabel,
                         item_name: it.name,
+                        system_id: it.system_id || '',
                         type: it.type,
                         original_dims: formatDimensions(it.length_mm, it.width_mm, it.height_mm),
                         padded_dims: formatDimensions(it.pL, it.pW, it.pH),
@@ -2763,15 +3634,14 @@ for (const it of data.unpacked) {
         }
 
 for (const it of S.result.unpacked) {
-    const status = it.unpackedReason === 'no_trays' 
-        ? 'UNPACKED - Tray Inventory Exhausted' 
-        : 'UNPACKED - Requires Custom Crate';
+    const status = 'UNPACKED - ' + unpackedReasonText(it.unpackedReason);
         
     rows.push({
         section: 'items',
         crate_id: '\u2014',
         tray_id: '\u2014',
         item_name: it.name,
+        system_id: it.system_id || '',
         type: it.type,
         original_dims: formatDimensions(it.length_mm, it.width_mm, it.height_mm),
         padded_dims: formatDimensions(it.pL, it.pW, it.pH),
@@ -2929,7 +3799,8 @@ for (const it of S.result.unpacked) {
         sub.textContent = 'Internal footprint ' + tray.fp.l + '\u00d7' + tray.fp.w + ' mm'
             + ' \u00b7 depth ' + tray.depth + ' mm'
             + ' \u00b7 ' + tray.items.length + ' item(s)'
-            + ' \u00b7 scale 1:' + Math.round(1 / (scale * 0.2646));
+            + ' \u00b7 scale 1:' + Math.round(1 / (scale * 0.2646))
+            + (opts.subNote ? ' \u00b7 ' + opts.subNote : '');
 
         head.append(title, sub);
         block.appendChild(head);
@@ -2946,6 +3817,7 @@ for (const it of S.result.unpacked) {
         diag.style.height = (tray.fp.w * scale) + 'px';
         diag._tray = tray;
         diag._scale = scale;
+        if (opts.badgeSmall) diag.classList.add('badge-sm');
 
         const ordered = trayItemsSorted(tray);
 
@@ -2969,12 +3841,9 @@ for (const it of S.result.unpacked) {
         wrap.appendChild(bar);
         body.appendChild(wrap);
 
+        if (!opts.noLegend) {
         const legend = document.createElement('div');
         legend.className = 'tray-legend' + (opts.print ? ' print' : '');
-
-        if (opts.print && opts.legendCols) {
-            legend.style.columnCount = opts.legendCols;
-        }
 
         ordered.forEach((it, i) => {
             const e = document.createElement('div');
@@ -3019,6 +3888,7 @@ for (const it of S.result.unpacked) {
         });
 
         body.appendChild(legend);
+        }
         block.appendChild(body);
 
         return block;
@@ -3201,69 +4071,274 @@ for (const it of S.result.unpacked) {
         renderTrays(S.result);
     }
 
-    /* ---- PDF export (print dialog -> "Save as PDF", one tray per page) ---- */
+    /* ---- PDF export (print dialog -> "Save as PDF") ----
+       Portrait A4. For each tray: one page with the tray diagram, then the object list on the
+       next page (more pages if the list needs them). Column and page breaks for the list are
+       decided here, not left to the browser. */
+
+    const PRINT = {
+        PAGE_W: 733,          // A4 portrait content width at 8mm margins (96dpi px)
+        PAGE_H: 1062,         // A4 portrait content height
+        SAFE: 8,              // px kept free at the foot of every page
+        COMPACT_AT: 40,       // above this many items the list uses single-line rows, no thumbnails
+        LEGEND_GAP: 8,        // matches .tray-legend.print margin-top
+        SMALL_ITEM_PX: 28     // median item short side (px) below which number badges shrink
+    };
+
+    function trayTitleText(tray, crate) {
+        return (crate.isOversized ? crate.id : ('Crate ' + crate.id)) + ' \u00b7 Tray ' + (tray.trayNo ?? tray.id);
+    }
+
+    function makePrintEntry(it, num, compact, large) {
+        const e = document.createElement('div');
+        e.className = 'legend-entry' + (compact ? ' compact' : '') + (compact && large ? ' large' : '');
+
+        const numEl = document.createElement('span');
+        numEl.className = 'legend-num';
+        numEl.textContent = num;
+        e.appendChild(numEl);
+
+        if (!compact && it.img) {
+            const th = document.createElement('img');
+            th.className = 'legend-thumb';
+            th.alt = '';
+            setImgSrc(th, it.img, () => th.remove());
+            e.appendChild(th);
+        }
+
+        const tb = itemTrueBox(it);
+
+        const txt = document.createElement('div');
+        txt.className = 'legend-txt';
+
+        const nmEl = document.createElement('div');
+        nmEl.className = 'legend-name';
+        nmEl.textContent = it.name || '(unnamed)';
+
+        const dm = document.createElement('div');
+        dm.className = 'legend-dims';
+        dm.textContent = round1(tb.L) + '\u00d7' + round1(tb.W) + ' mm';
+
+        txt.append(nmEl, dm);
+        e.appendChild(txt);
+        return e;
+    }
+
+    // Legend laid out as explicit columns so breaks are ours, not the browser's
+    function makeLegendShell(cols, columnNodes) {
+        const el = document.createElement('div');
+        el.className = 'tray-legend print';
+
+        for (let i = 0; i < cols; i++) {
+            const c = document.createElement('div');
+            c.className = 'legend-col';
+            ((columnNodes && columnNodes[i]) || []).forEach(n => c.appendChild(n));
+            el.appendChild(c);
+        }
+
+        return el;
+    }
+
+    // Build entries and measure each at the real column width for `cols` columns
+    function measureEntries(stage, ordered, compact, cols, large) {
+        const probe = makeLegendShell(cols);
+        stage.appendChild(probe);
+
+        const nodes = ordered.map((it, i) => makePrintEntry(it, i + 1, compact, large));
+        const heights = nodes.map(n => {
+            probe.firstChild.appendChild(n);
+            return n.offsetHeight;
+        });
+
+        probe.remove();
+        return { nodes, heights };
+    }
+
+    // Smallest column height at which the entries fit in `cols` columns filled in order
+    function minColHeight(heights, cols) {
+        if (!heights.length) return 0;
+
+        const fits = H => {
+            let used = 0;
+            let c = 1;
+            for (const h of heights) {
+                if (used + h > H) { c++; used = 0; }
+                used += h;
+            }
+            return c <= cols;
+        };
+
+        let lo = Math.max(...heights);
+        let hi = heights.reduce((a, b) => a + b, 0);
+
+        while (lo < hi) {
+            const mid = Math.floor((lo + hi) / 2);
+            if (fits(mid)) hi = mid; else lo = mid + 1;
+        }
+
+        return lo;
+    }
+
+    // Returns pages -> columns -> nodes
+    function fillColumns(nodes, heights, cols, colH) {
+        const pages = [];
+        let page = [[]];
+        let used = 0;
+
+        nodes.forEach((n, i) => {
+            if (used + heights[i] > colH && page[page.length - 1].length) {
+                if (page.length < cols) {
+                    page.push([]);
+                } else {
+                    pages.push(page);
+                    page = [[]];
+                }
+                used = 0;
+            }
+            page[page.length - 1].push(n);
+            used += heights[i];
+        });
+
+        pages.push(page);
+        return pages;
+    }
+
     function buildPrintRoot() {
         const root = $('print-root');
         root.innerHTML = '';
 
         if (!S.result) return 0;
 
-        const PAGE_H = 733;   // A4 landscape content height at 8mm margins (96dpi px)
-        const PAGE_W = 1062;  // A4 landscape content width
+        const { PAGE_W, PAGE_H, SAFE, COMPACT_AT, LEGEND_GAP, SMALL_ITEM_PX } = PRINT;
+        const USABLE_H = PAGE_H - SAFE;
 
-        // off-screen stage for measuring real (wrapped) legend heights
+        // off-screen stage for measuring real (wrapped) heights
         const stage = document.createElement('div');
         stage.style.cssText = 'position:absolute;left:-12000px;top:0;width:' + PAGE_W + 'px;visibility:hidden';
         document.body.appendChild(stage);
 
         let pages = 0;
 
+        const addPage = el => {
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            page.appendChild(el);
+            root.appendChild(page);
+            pages++;
+        };
+
         S.result.crates.forEach(crate => {
             crate.trays.forEach(tray => {
-                const items = Math.max(1, tray.items.length);
-                let cols = Math.max(3, Math.min(8, Math.ceil(items / 15)));
+                const ordered = trayItemsSorted(tray);
+                const compact = ordered.length > COMPACT_AT;
 
-                const make = (sc, c) => {
+                const sides = ordered.map(it => {
+                    const b = itemTrueBox(it);
+                    return Math.min(b.L, b.W);
+                }).sort((a, b) => a - b);
+                const medSide = sides.length ? sides[sides.length >> 1] : 0;
+
+                const makeBlock = (sc, note) => {
                     const b = buildTrayBlock(tray, crate, {
                         scale: sc,
                         interactive: false,
                         print: true,
-                        legendCols: c
+                        noLegend: true,
+                        subNote: note || '',
+                        badgeSmall: medSide * sc < SMALL_ITEM_PX
                     });
                     stage.appendChild(b);
                     return b;
                 };
 
-                let scale = Math.min(PAGE_W / tray.fp.l, 430 / tray.fp.w);
-                let blk = make(scale, cols);
+                // fixed vertical overhead (title, scale bar) so scales can be solved directly
+                const probeBlk = makeBlock(1);
+                const overhead = probeBlk.offsetHeight - tray.fp.w;
+                probeBlk.remove();
 
-                // widen the numbered list until it is reasonably short
-                while (blk.querySelector('.tray-legend').offsetHeight > 430 && cols < Math.min(8, items)) {
-                    cols++;
-                    blk.remove();
-                    blk = make(scale, cols);
-                }
+                // scale if the diagram had the whole page
+                const fullScale = Math.min(PAGE_W / tray.fp.l, (USABLE_H - overhead) / tray.fp.w);
 
-                // shrink the diagram until the whole block fits one page
+                /* ---- page 1: tray diagram at the largest scale the page allows; then the list page(s) ---- */
+                let scale = fullScale;
+                let blk = makeBlock(scale, 'item list on next page');
+
                 let guard = 0;
-
-                while (blk.offsetHeight > PAGE_H && guard < 8) {
-                    const diag = blk.querySelector('.tray-diagram');
-                    const over = blk.offsetHeight - PAGE_H;
-                    const newDiagH = Math.max(150, diag.offsetHeight - over);
-                    scale = scale * (newDiagH / diag.offsetHeight);
+                while (blk.offsetHeight > USABLE_H && guard < 6) {
                     blk.remove();
-                    blk = make(scale, cols);
+                    scale *= 0.96;
+                    blk = makeBlock(scale, 'item list on next page');
                     guard++;
                 }
 
-                blk.remove();
+                addPage(blk);
 
-                const page = document.createElement('div');
-                page.className = 'print-page';
-                page.appendChild(blk);
-                root.appendChild(page);
-                pages++;
+                const headFor = (k, total) => {
+                    const h = document.createElement('div');
+                    h.className = 'tray-head';
+
+                    const t = document.createElement('div');
+                    t.className = 'tray-title';
+                    t.textContent = trayTitleText(tray, crate);
+
+                    const sb = document.createElement('div');
+                    sb.className = 'tray-sub';
+                    sb.textContent = 'Item list \u00b7 ' + ordered.length + ' item(s)'
+                        + (total > 1 ? ' \u00b7 page ' + k + ' of ' + total : '');
+
+                    h.append(t, sb);
+                    return h;
+                };
+
+                const wrapFor = (k, total, legendEl) => {
+                    const w = document.createElement('div');
+                    w.className = 'tray-block print-tray-block';
+                    w.append(headFor(k, total), legendEl);
+                    return w;
+                };
+
+                // head height, measured with the longest label
+                const headProbe = wrapFor(1, 2, document.createElement('div'));
+                stage.appendChild(headProbe);
+                const headH = headProbe.offsetHeight;
+                headProbe.remove();
+
+                const listBudget = USABLE_H - headH - LEGEND_GAP;
+
+                // list pages have room: try larger rows first, then the standard size
+                const variants = compact
+                    ? [{ large: true, range: [1, 2] }, { large: false, range: [1, 2, 3] }]
+                    : [{ large: false, range: [1, 2, 3] }];
+
+                let listPages = null;
+                let listCols = 0;
+
+                // fewest columns (widest names) that keeps the whole list on one page
+                for (const v of variants) {
+                    for (const c of v.range) {
+                        const m = measureEntries(stage, ordered, compact, c, v.large);
+                        const colH = minColHeight(m.heights, c);
+
+                        if (colH <= listBudget) {
+                            listCols = c;
+                            listPages = fillColumns(m.nodes, m.heights, c, colH);
+                            break;
+                        }
+                    }
+                    if (listPages) break;
+                }
+
+                // still too long: standard rows, widest layout, as many pages as it takes
+                if (!listPages) {
+                    const v = variants[variants.length - 1];
+                    listCols = v.range[v.range.length - 1];
+                    const m = measureEntries(stage, ordered, compact, listCols, v.large);
+                    listPages = fillColumns(m.nodes, m.heights, listCols, listBudget);
+                }
+
+                listPages.forEach((columnNodes, k) => {
+                    addPage(wrapFor(k + 1, listPages.length, makeLegendShell(listCols, columnNodes)));
+                });
             });
         });
 
@@ -3296,7 +4371,7 @@ for (const it of S.result.unpacked) {
         setStatus('Ready');
 
         alertMsg(
-            'In the print dialog choose \u201cSave as PDF\u201d as the destination \u2014 one tray per landscape A4 page.',
+            'In the print dialog choose \u201cSave as PDF\u201d as the destination \u2014 portrait A4: a diagram page for each tray, followed by its object list page(s).',
             'info'
         );
 
@@ -3377,121 +4452,6 @@ for (const it of S.result.unpacked) {
     }
 
     /* ================================================================
-       CLM/1 SUITE HAND-OFF  (shared across suite apps — see README.md)
-    ================================================================ */
-    function exportCLM() {
-        if (!S.result) { alertMsg('Run the packer first.', 'warning'); return; }
-
-        const items = [];
-        const containers = [];
-        const tS = S.result.cfg.trayStruct;
-
-        S.result.crates.forEach(c => {
-            const crateId = c.isOversized ? String(c.id) : ('Crate ' + c.id);
-            const trayIds = [];
-
-            c.trays.forEach(t => {
-                const trayId = crateId + ' \u00b7 Tray ' + (t.trayNo ?? t.id);
-                trayIds.push(trayId);
-                containers.push({
-                    id: trayId,
-                    kind: 'tray',
-                    parent: crateId,
-                    l: t.extL ?? (t.fp.l + 2 * tS.sideWall),
-                    w: t.extW ?? (t.fp.w + 2 * tS.sideWall),
-                    h: t.extD ?? (t.depth + tS.base + tS.lid),
-                    external: true,
-                    meta: {
-                        footprintInternal: [t.fp.l, t.fp.w],
-                        depthInternal: t.depth,
-                        type: t.type,
-                        util: Math.round((t.util || 0) * 100) / 100
-                    }
-                });
-
-                t.items.forEach((it, k) => {
-                    items.push({
-                        id: it.acc || (crateId + '-' + (t.trayNo ?? t.id) + '-' + (k + 1)),
-                        name: it.name,
-                        type: it.type,
-                        dims: { l: it.length_mm, w: it.width_mm, h: it.height_mm },
-                        dimsAssumed: !!it.dimAssumed,
-                        padding: { pL: it.pL, pW: it.pW, pH: it.pH },
-                        image: it.img || undefined,
-                        placement: {
-                            container: crateId,
-                            tray: trayId,
-                            x: it.px,
-                            z: it.pz,
-                            rot: it.rot ? 90 : 0
-                        }
-                    });
-                });
-            });
-
-            containers.push({
-                id: crateId,
-                kind: 'crate',
-                l: c.ext.l, w: c.ext.w, h: c.ext.h,
-                external: true,
-                children: trayIds,
-                meta: { isOversized: !!c.isOversized, overMax: !!c.overMax }
-            });
-        });
-
-        (S.result.unpacked || []).forEach((it, k) => {
-            items.push({
-                id: it.acc || ('unpacked-' + (k + 1)),
-                name: it.name,
-                type: it.type,
-                dims: { l: it.length_mm, w: it.width_mm, h: it.height_mm },
-                dimsAssumed: !!it.dimAssumed,
-                notes: it.unpackedReason === 'no_trays'
-                    ? 'not packed \u2014 tray inventory exhausted'
-                    : 'not packed \u2014 needs custom crate'
-            });
-        });
-
-        const m = CLM.make(CLM_PROJECT, 'capackybara', items, containers, []);
-        CLM.download(m, String(CLM_PROJECT).replace(/[^\w\-]+/g, '_') + '-manifest.json');
-        CLM.handoff(m);
-        alertMsg('Manifest downloaded \u2014 open it in Stick it on a Shelf ("Load Manifest") or inspect it in index.html.', 'success');
-    }
-
-    function loadCLMManifest(m) {
-        const rows = (m.items || []).filter(it => it && it.name && it.dims);
-        S.raw = rows.map(it => ({
-            name: String(it.name),
-            summary: String(it.name),
-            acc: it.id ? String(it.id) : '',
-            type: normType(it.type || ''),
-            length_mm: numOrNull(it.dims.l),
-            width_mm: numOrNull(it.dims.w),
-            height_mm: numOrNull(it.dims.h),
-            img: it.image ? String(it.image) : ''
-        }));
-
-        if (!S.raw.length) { alertMsg('Manifest has no usable items.', 'warning'); return; }
-
-        CLM_PROJECT = (m.project ? String(m.project) : 'manifest') + ' (manifest)';
-        S.colorMap = buildColorMap(discoverTypes());
-        refreshHeightDefaults();
-        showFileStatus(S.raw.length, 'manifest \u2014 ' + ((m.source && m.source.app) || 'suite'));
-        probeImages();
-        alertMsg('Loaded ' + S.raw.length + ' item(s) from manifest \u201c' + (m.project || 'Untitled') + '\u201d', 'success');
-    }
-
-    function handleCLMFile(file) {
-        if (!file) return;
-        file.text().then(txt => {
-            let m;
-            try { m = CLM.parse(txt); }
-            catch (e) { alertMsg('Not a valid clm/1 manifest: ' + e.message, 'error'); return; }
-            loadCLMManifest(m);
-        }).catch(e => alertMsg('Could not read manifest: ' + e.message, 'error'));
-    }
-
-    /* ================================================================
        INIT
     ================================================================ */
     function init() {
@@ -3506,23 +4466,6 @@ for (const it of S.result.unpacked) {
             if (e.target.files[0]) handleFile(e.target.files[0]);
         });
 
-        $('btn-media-folder').addEventListener('click', () => $('media-folder').click());
-        $('media-folder').addEventListener('change', e => {
-            const n = ingestMediaFolder(e.target.files);
-            e.target.value = '';
-
-            if (!n) {
-                alertMsg('No images found in that folder', 'warning');
-                return;
-            }
-
-            alertMsg('Local images folder loaded: ' + n + ' image(s). They stay in your browser \u2014 nothing is uploaded.', 'success');
-            if (S.result) renderTrays(S.result);
-            else if (S.raw.length) probeImages();
-        });
-
-        $('btn-sample').addEventListener('click', loadSample);
-
         $('btn-clm-in').addEventListener('click', () => $('clm-file').click());
         $('clm-file').addEventListener('change', e => {
             if (e.target.files[0]) handleCLMFile(e.target.files[0]);
@@ -3530,6 +4473,8 @@ for (const it of S.result.unpacked) {
         });
         $('btn-clm-out').addEventListener('click', exportCLM);
         CLM.offerBanner('capackybara', loadCLMManifest);
+
+        $('btn-sample').addEventListener('click', loadSample);
 
         $('btn-add-fp').addEventListener('click', () => addFpRow());
 
@@ -3542,7 +4487,8 @@ for (const it of S.result.unpacked) {
                 return;
             }
 
-            S.heightDefaults[name] = height;
+            const existing = Object.keys(S.heightDefaults).find(k => k.toLowerCase() === name.toLowerCase());
+            S.heightDefaults[existing || name] = height;
             rebuildHeightDefaultsUI();
 
             $('new-type-name').value = '';
